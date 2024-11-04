@@ -3,6 +3,7 @@ const path = require('path');
 const xlsx = require('xlsx');
 const { Parser } = require('json2csv');
 
+console.log("oh yes")
 const diretorio = path.join(__dirname,'/data/01 JANEIRO 2024');
 let dadosColetados = [];
 
