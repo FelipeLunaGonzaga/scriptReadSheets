@@ -3,8 +3,7 @@ const path = require('path');
 const xlsx = require('xlsx');
 const { Parser } = require('json2csv');
 
-console.log("oh yes")
-const diretorio = path.join(__dirname,'/data/01 JANEIRO 2024');
+const diretorio = path.join(__dirname, '/data/05 MAIO 2024');
 let dadosColetados = [];
 
 function lerPlanilhasEmDiretorio(diretorio) {
@@ -28,13 +27,13 @@ function lerPlanilhasEmDiretorio(diretorio) {
           lerPlanilhasEmDiretorio(caminhoCompleto);
         } else if (path.extname(arquivo) === '.xlsx' || path.extname(arquivo) === '.xls') {
           const workbook = xlsx.readFile(caminhoCompleto);
-          const sheetName = workbook.SheetNames[0]; // Pega a primeira aba da planilha
+          const sheetName = workbook.SheetNames[3]; // Pega a tercfeira aba da planilha
           const sheet = workbook.Sheets[sheetName];
 
-          // Coleta os dados de H12 até BC12 (linha 12, zero-indexada é 11)
+          // Coleta os dados de F33 até BC12 (zero-indexada) ANTES ESTAVA COL = 7; COL <= 55; QUANDO COLETAVA DADOS DOS OPERADORES NA PRIMEIRA ABA
           let linhaDados = [];
-          for (let col = 7; col <= 55; col++) { // 7 = H, 55 = BC
-            const cellAddress = xlsx.utils.encode_cell({ r: 11, c: col }); // r: 11 -> linha 12
+          for (let col = 5; col <= 52; col++) { // 7 = H, 55 = BC /// DADOS QUANDO FOR BUSCAR NA PRIMEIRA ABA
+            const cellAddress = xlsx.utils.encode_cell({ r: 33, c: col }); // r: 33 -> linha 34 NA ABA DE "BD"
             const cell = sheet[cellAddress];
             linhaDados.push(cell ? cell.v : '');
           }
@@ -57,14 +56,38 @@ if (fs.existsSync(diretorio)) {
 }
 
 setTimeout(() => {
-  const camposCSV = ['arquivo', 'nomePlanilha', ...Array.from({ length: 49 }, (_, i) => `coluna_${String.fromCharCode(72 + i)}`)];
+  const hour = 6;
+  const camposCSV = ['arquivo', 'nomePlanilha', ...Array.from({ length: 48 }, (pp, i) =>{    
+    
+    //ToDo
+
+    //fazer logica de quando vai ter zero no inicio ou não
+    // fazer logica de quando somar ou não com a variável hour dependendo se o index "i" for impar ou par
+    // criar os ifs necessários para executaqr o codigo acima
+    const endstring = i%2 === 0 ? ":30" : "00"; // se for par, então escreve 30. Se não, escreve 00
+
+
+    
+    
+    
+    
+    
+    
+    
+return `coluna_${String.fromCharCode(70 + i)
+  }`
+  }
+  )]; // 72 + i ANTERIORMENTE CABEALHO
   const json2csvParser = new Parser({ fields: camposCSV });
   const csv = json2csvParser.parse(dadosColetados.map(({ arquivo, nomePlanilha, dados }) => {
+
+    const [dia, mes, anoXMLS] = arquivo.split(" ").filter(data => data && !String(data).toLowerCase().includes("de"))
+    const ano = anoXMLS.split(".")[0]
     return {
       arquivo,
       nomePlanilha,
       ...dados.reduce((acc, val, index) => {
-        acc[`coluna_${String.fromCharCode(72 + index)}`] = val; // H, I, J, ... BC
+        acc[`coluna_${String.fromCharCode(70 + index)}`] = val; // F, G... BA
         return acc;
       }, {})
     };

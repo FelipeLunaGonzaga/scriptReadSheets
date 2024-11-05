@@ -1,1 +1,5 @@
 # scriptReadSheets
+
+
+!!! Estudar depois
+
