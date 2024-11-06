@@ -1,10 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const xlsx = require('xlsx');
+
 const { Parser } = require('json2csv');
 
 const diretorio = path.join(__dirname, '01 JANEIRO 2024');
-let dadosColetados = [];
+let dadosColetados:String[][] = [];
 
 function lerPlanilhasEmDiretorio(diretorio) {
   fs.readdir(diretorio, (err, arquivos) => {
@@ -75,4 +76,6 @@ setTimeout(() => {
 console.log(dadosColetados.length)
 
   fs.writeFileSync('dadosColetados.csv', csv);
+
 }, 5000);
+
