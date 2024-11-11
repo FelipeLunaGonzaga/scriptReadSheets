@@ -1,44 +1,56 @@
-const fs = require("fs")
-const { validateLocaleAndSetLanguage } = require("typescript")
+const fs = require("fs");
+const { Parser } = require("json2csv");
 
-const horariosPermitidos = ["06:30:00","07:00:00","07:30:00","08:00:00","08:30:00","09:00:00","09:30:00","10:00:00","10:30:00","11:00:00","11:30:00","12:00:00","12:30:00","13:00:00","13:30:00","14:00:00","14:30:00","15:00:00","15:30:00","16:00:00","16:30:00","17:00:00","17:30:00","18:00:00","18:30:00","19:00:00","19:30:00","20:00:00","20:30:00","21:00:00","21:30:00","22:00:00","22:30:00","23:00:00","23:30:00","00:00:00","00:30:00","01:00:00","01:30:00","02:00:00","02:30:00","03:00:00","03:30:00","04:00:00","04:30:00","05:00:00","05:30:00","06:00:00"];
+const horariosPermitidos = [
+  "06:30:00","07:00:00","07:30:00","08:00:00","08:30:00","09:00:00",
+  "09:30:00","10:00:00","10:30:00","11:00:00","11:30:00","12:00:00",
+  "12:30:00","13:00:00","13:30:00","14:00:00","14:30:00","15:00:00",
+  "15:30:00","16:00:00","16:30:00","17:00:00","17:30:00","18:00:00",
+  "18:30:00","19:00:00","19:30:00","20:00:00","20:30:00","21:00:00",
+  "21:30:00","22:00:00","22:30:00","23:00:00","23:30:00","00:00:00",
+  "00:30:00","01:00:00","01:30:00","02:00:00","02:30:00","03:00:00",
+  "03:30:00","04:00:00","04:30:00","05:00:00","05:30:00","06:00:00"
+];
 
-
-const dataSotAsyncrono = fs.readdirSync('./datasot','utf8')
-
-const janeiro = fs.readdirSync(`./datasot/${dataSotAsyncrono}`,'utf8')
+const dataSotAsyncrono = fs.readdirSync('./datasot','utf8');
+const janeiro = fs.readdirSync(`./datasot/${dataSotAsyncrono}`,'utf8');
 
 const janeiroFiltrado = janeiro.filter(
-    (nomeDoArquivo) => nomeDoArquivo.includes("_sect_config.csv")
-)
+  (nomeDoArquivo) => nomeDoArquivo.includes("_sect_config.csv")
+);
 
-const leituraDoscsv = fs.readFileSync(`./datasot/${dataSotAsyncrono}/${janeiroFiltrado[0]}`,"utf8")
+const leituraDoscsv = fs.readFileSync(`./datasot/${dataSotAsyncrono}/${janeiroFiltrado[0]}`,"utf8");
 
-const csvSplitadoPorLinhas = leituraDoscsv.split("\n").map(linha=>linha.split(';'));
+const csvSplitadoPorLinhas = leituraDoscsv.split("\n").map(linha => linha.split(';'));
 
 const arrayStartingWith3And0 = [];
-let ultimoHorario = ''
+let ultimoHorario = '';
 
-for ( const linha of csvSplitadoPorLinhas ) {
-    const [semana,dia,hora,...resto] = linha
-    if(hora) {
-    if(ultimoHorario !== hora && (hora[3] === "3" || hora[3] === "0")) {
-        ultimoHorario = hora
-        arrayStartingWith3And0.push([...linha])
-    
-    } 
-}
+for (const linha of csvSplitadoPorLinhas) {
+  const [semana, dia, hora, ...resto] = linha;
+  if (hora) {
+    if (ultimoHorario !== hora && (hora[3] === "3" || hora[3] === "0")) {
+      ultimoHorario = hora;
+      arrayStartingWith3And0.push([...linha]);
+    }
+  }
 }
 
-const filteredBy30Minutes = arrayStartingWith3And0.filter(linha => horariosPermitidos.includes(linha[2])) //horario zulu
-const horariosDe30em30 = filteredBy30Minutes.map(linha => linha[2])
+const filteredBy30Minutes = arrayStartingWith3And0.filter(linha => horariosPermitidos.includes(linha[2]));
+const horariosDe30em30 = filteredBy30Minutes.map(linha => linha[2]);
 const setoresSplit = filteredBy30Minutes.map(linha => linha[11].split("|").length);
 
-console.log(horariosDe30em30, ' ', setoresSplit)
+const dadosCSV = filteredBy30Minutes.map((linha, index) => ({
+  dia: linha[1],
+  horario: horariosDe30em30[index],
+  setores: setoresSplit[index],
+  
+}));
 
+const campos = ['dia', 'horario', 'setores'];
+const json2csvParser = new Parser({ fields: campos });
+const csv = json2csvParser.parse(dadosCSV);
 
+fs.writeFileSync('janeiroSOTSetores.csv', csv, 'utf8');
 
-
-
-
-
+console.log("Arquivo 'janeiroSOTSetores.csv' gerado com sucesso!");
