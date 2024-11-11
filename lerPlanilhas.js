@@ -91,8 +91,8 @@ function adicionarUmaplanilha(diretorio){
       };
     }));
   
-    fs.appendFileSync('dadosColetados.csv', csv);
-    fs.appendFileSync('dadosColetados.csv', "\n");
+    fs.appendFileSync('../dadosColetados.csv', csv);
+    fs.appendFileSync('../dadosColetados.csv', "\n");
     console.log(`Dados coletados de ${dadosColetados.length} planilhas.`);
   }, 5000); // Espera 5 segundos para garantir que todas as leituras estejam completas
   
