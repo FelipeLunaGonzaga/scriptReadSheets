@@ -16,25 +16,6 @@ const leituraDoscsv = fs.readFileSync(`./datasot/${dataSotAsyncrono}/${janeiroFi
 
 const csvSplitadoPorLinhas = leituraDoscsv.split("\n").map(linha=>linha.split(';'));
 
-/*
-ideia antiga 
- const filteredBy30Minutes =  csvSplitadoPorLinhas.filter((linha,i)=>{
-    const [semana,dia,hora,...resto] = linha
-    const hasHora = hora !== undefined
-
-    const temDoisPontos =  hasHora ? hora.includes(":") : false
-    const [horaa,minuto,segundos] =  temDoisPontos ? hora.split(":") : ["","",""] 
-    const temHorarioPermitido = horariosPermitidos.includes(hora)
-    
-    if (temHorarioPermitido){
-    return linha
-    }
-})
-   
-*/
-
-/* ideia nova */
-
 const arrayStartingWith3And0 = [];
 let ultimoHorario = ''
 
@@ -44,12 +25,16 @@ for ( const linha of csvSplitadoPorLinhas ) {
     if(ultimoHorario !== hora && (hora[3] === "3" || hora[3] === "0")) {
         ultimoHorario = hora
         arrayStartingWith3And0.push([...linha])
-    }}
+    
+    } 
+}
 }
 
 const filteredBy30Minutes = arrayStartingWith3And0.filter(linha => horariosPermitidos.includes(linha[2])) //horario zulu
+const horariosDe30em30 = filteredBy30Minutes.map(linha => linha[2])
+const setoresSplit = filteredBy30Minutes.map(linha => linha[11].split("|").length);
 
-
+console.log(horariosDe30em30, ' ', setoresSplit)
 
 
 

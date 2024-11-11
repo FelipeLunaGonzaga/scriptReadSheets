@@ -63,15 +63,7 @@ function adicionarUmaplanilha(diretorio){
     const hour = 6;
     const camposCSV = ['arquivo', 'nomePlanilha', ...Array.from({ length: 48 }, (pp, i) => `coluna_${String.fromCharCode(70 + i)
         }`
-  
-      //ToDo
-  
-      //fazer logica de quando vai ter zero no inicio ou não
-      // fazer logica de quando somar ou não com a variável hour dependendo se o index "i" for impar ou par
-      // criar os ifs necessários para executaqr o codigo acima
-      //cont begstring = i%2 === 0 &&  ? "0" hour+i :
-      //const endstring = i%2 === 0 ? ":30" : "00"; // se for par, então escreve 30. Se não, escreve 00
-  
+
     
     )]; // 72 + i ANTERIORMENTE CABEALHO
     const json2csvParser = new Parser({ fields: camposCSV });
