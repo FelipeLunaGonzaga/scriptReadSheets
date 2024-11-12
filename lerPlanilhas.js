@@ -62,16 +62,12 @@ function adicionarUmaplanilha(diretorio){
   setTimeout(() => {
     const hour = 6;
     const camposCSV = ['arquivo', 'nomePlanilha', ...Array.from({ length: 48 }, (pp, i) => `coluna_${String.fromCharCode(70 + i)
-        }`
+        }`)]; 
 
-    
-    )]; // 72 + i ANTERIORMENTE CABEALHO
     const json2csvParser = new Parser({ fields: camposCSV });
     const csv = json2csvParser.parse(dadosColetados.map(({ arquivo, nomePlanilha, dados }) => {
   
-     //ToDo 
-     // const [dia, mes, anoXMLS] = arquivo.split(" ").filter(data => data && !String(data).toLowerCase().includes("de"))
-     //const ano = anoXMLS.split(".")[0]
+    
       
      return {
         arquivo,

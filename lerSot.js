@@ -12,45 +12,68 @@ const horariosPermitidos = [
   "03:30:00","04:00:00","04:30:00","05:00:00","05:30:00","06:00:00"
 ];
 
-const dataSotAsyncrono = fs.readdirSync('./datasot','utf8');
-const janeiro = fs.readdirSync(`./datasot/${dataSotAsyncrono}`,'utf8');
+// Função para processar cada arquivo CSV específico
+function processarArquivoCSV(caminhoArquivo) {
+  const leituraCsv = fs.readFileSync(caminhoArquivo, "utf8");
 
-const janeiroFiltrado = janeiro.filter(
-  (nomeDoArquivo) => nomeDoArquivo.includes("_sect_config.csv")
-);
+  // Processamento dos dados CSV
+  const linhasCsv = leituraCsv.split("\n").map(linha => linha.split(';'));
+  const arrayStartingWith3And0 = [];
+  let ultimoHorario = '';
 
-const leituraDoscsv = fs.readFileSync(`./datasot/${dataSotAsyncrono}/${janeiroFiltrado[0]}`,"utf8");
-
-const csvSplitadoPorLinhas = leituraDoscsv.split("\n").map(linha => linha.split(';'));
-
-const arrayStartingWith3And0 = [];
-let ultimoHorario = '';
-
-for (const linha of csvSplitadoPorLinhas) {
-  const [semana, dia, hora, ...resto] = linha;
-  if (hora) {
-    if (ultimoHorario !== hora && (hora[3] === "3" || hora[3] === "0")) {
+  for (const linha of linhasCsv) {
+    const [semana, dia, hora, ...resto] = linha;
+    if (hora && ultimoHorario !== hora && (hora[3] === "3" || hora[3] === "0")) {
       ultimoHorario = hora;
       arrayStartingWith3And0.push([...linha]);
     }
   }
+
+  const filtradosPorHorario = arrayStartingWith3And0.filter(linha => horariosPermitidos.includes(linha[2]));
+  const setoresSplit = filtradosPorHorario.map(linha => linha[11].split("|").length);
+
+  // Criação das linhas de dados para o CSV
+  const linhaDeSetores = Array(horariosPermitidos.length).fill('');
+  for (let i = 0; i < horariosPermitidos.length; i++) {
+    const horarioIndex = filtradosPorHorario.findIndex(linha => linha[2] === horariosPermitidos[i]);
+    linhaDeSetores[i] = horarioIndex !== -1 ? setoresSplit[horarioIndex] : '';
+  }
+
+  // Retorna os dados organizados em um objeto para o CSV
+  return {
+    Dia: filtradosPorHorario[0][1],
+    ...Object.fromEntries(horariosPermitidos.map((horario, i) => [horario, linhaDeSetores[i]]))
+  };
 }
 
-const filteredBy30Minutes = arrayStartingWith3And0.filter(linha => horariosPermitidos.includes(linha[2]));
-const horariosDe30em30 = filteredBy30Minutes.map(linha => linha[2]);
-const setoresSplit = filteredBy30Minutes.map(linha => linha[11].split("|").length);
+// Função para adicionar todos os dados de diretórios e arquivos
+function adicionarPlanilhasDeDiretorio(diretorio) {
+  const arquivos = fs.readdirSync(diretorio, 'utf8');
+  const arquivosFiltrados = arquivos.filter(nomeDoArquivo => nomeDoArquivo.includes("_sect_config.csv"));
 
-const dadosCSV = filteredBy30Minutes.map((linha, index) => ({
-  dia: linha[1],
-  horario: horariosDe30em30[index],
-  setores: setoresSplit[index],
-  
-}));
+  // Variável para controlar o cabeçalho CSV
+  let isPrimeiraLinha = true;
 
-const campos = ['dia', 'horario', 'setores'];
-const json2csvParser = new Parser({ fields: campos });
-const csv = json2csvParser.parse(dadosCSV);
+  arquivosFiltrados.forEach((arquivo) => {
+    const caminhoArquivo = `${diretorio}/${arquivo}`;
+    const dadosDia = processarArquivoCSV(caminhoArquivo);
 
-fs.writeFileSync('janeiroSOTSetores.csv', csv, 'utf8');
+    // Define o cabeçalho e converte para CSV
+    const headerCSV = ['Dia', ...horariosPermitidos];
+    const json2csvParser = new Parser({ fields: headerCSV });
+    const csv = json2csvParser.parse([dadosDia]);
 
-console.log("Arquivo 'janeiroSOTSetores.csv' gerado com sucesso!");
+    // Insere o cabeçalho apenas na primeira linha e apenas uma vez
+    if (isPrimeiraLinha) {
+      fs.writeFileSync('janeiroSOTSetores.csv', csv + "\n", "utf8");
+      isPrimeiraLinha = false;
+    } else {
+      const csvSemHeader = csv.split("\n").slice(1).join("\n");
+      fs.appendFileSync('janeiroSOTSetores.csv', csvSemHeader + "\n", "utf8");
+    }
+  });
+  console.log(`Arquivos do diretório ${diretorio} processados com sucesso!`);
+}
+
+// Lê todos os diretórios em "./datasot" e processa cada um
+fs.readdirSync("./datasot").forEach(diretorio => adicionarPlanilhasDeDiretorio(`./datasot/${diretorio}`));
