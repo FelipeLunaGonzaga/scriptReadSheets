@@ -1,5 +1,8 @@
 const fs = require("fs");
 const { Parser } = require("json2csv");
+const moment = require("moment");
+require("moment/locale/pt-br");
+moment.locale("pt-br");
 
 const horariosPermitidos = [
   "06:30:00","07:00:00","07:30:00","08:00:00","08:30:00","09:00:00",
@@ -12,11 +15,16 @@ const horariosPermitidos = [
   "03:30:00","04:00:00","04:30:00","05:00:00","05:30:00","06:00:00"
 ];
 
+function getDiaDaSemanaEmPortugues(data) {
+  const [dia, mes, ano] = data.split('/').map(Number);
+  const dataObj = new Date(ano, mes - 1, dia); // Ajuste de mês, pois começa em 0
+  const diasDaSemana = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+  return diasDaSemana[dataObj.getDay()];
+}
 // Função para processar cada arquivo CSV específico
 function processarArquivoCSV(caminhoArquivo) {
   const leituraCsv = fs.readFileSync(caminhoArquivo, "utf8");
 
-  // Processamento dos dados CSV
   const linhasCsv = leituraCsv.split("\n").map(linha => linha.split(';'));
   const arrayStartingWith3And0 = [];
   let ultimoHorario = '';
@@ -30,21 +38,27 @@ function processarArquivoCSV(caminhoArquivo) {
   }
 
   const filtradosPorHorario = arrayStartingWith3And0.filter(linha => horariosPermitidos.includes(linha[2]));
+
   const setoresSplit = filtradosPorHorario.map(linha => linha[11].split("|").length);
 
-  // Criação das linhas de dados para o CSV
   const linhaDeSetores = Array(horariosPermitidos.length).fill('');
   for (let i = 0; i < horariosPermitidos.length; i++) {
     const horarioIndex = filtradosPorHorario.findIndex(linha => linha[2] === horariosPermitidos[i]);
     linhaDeSetores[i] = horarioIndex !== -1 ? setoresSplit[horarioIndex] : '';
   }
 
+  // Verifica se existem dados em 'filtradosPorHorario' antes de acessar
+  const data = filtradosPorHorario.length > 0 ? filtradosPorHorario[0][1] : '';
+  const diaDaSemana = data ? getDiaDaSemanaEmPortugues(data) : ''; // Evita o erro ao acessar uma data vazia
+
   // Retorna os dados organizados em um objeto para o CSV
   return {
-    Dia: filtradosPorHorario[0][1],
+    Dia: data,
+    DiaDaSemana: diaDaSemana, // Nova coluna com o dia da semana em pt-BR
     ...Object.fromEntries(horariosPermitidos.map((horario, i) => [horario, linhaDeSetores[i]]))
   };
 }
+
 
 // Função para adicionar todos os dados de diretórios e arquivos
 function adicionarPlanilhasDeDiretorio(diretorio) {
@@ -59,13 +73,13 @@ function adicionarPlanilhasDeDiretorio(diretorio) {
     const dadosDia = processarArquivoCSV(caminhoArquivo);
 
     // Define o cabeçalho e converte para CSV
-    const headerCSV = ['Dia', ...horariosPermitidos];
+    const headerCSV = ['Dia', 'DiaDaSemana', ...horariosPermitidos];
     const json2csvParser = new Parser({ fields: headerCSV });
     const csv = json2csvParser.parse([dadosDia]);
 
     // Insere o cabeçalho apenas na primeira linha e apenas uma vez
     if (isPrimeiraLinha) {
-      fs.writeFileSync('janeiroSOTSetores.csv', csv + "\n", "utf8");
+      fs.appendFileSync('janeiroSOTSetores.csv', csv + "\n", "utf8");
       isPrimeiraLinha = false;
     } else {
       const csvSemHeader = csv.split("\n").slice(1).join("\n");
