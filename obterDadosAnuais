@@ -1,19 +1,25 @@
 function obterDadosAnuais() {
   const planilha = SpreadsheetApp.getActiveSpreadsheet();
-  const aba = planilha.getSheetByName("NOME_DA_ABA"); // Substitua pelo nome da aba
-  const dados = aba.getDataRange().getValues(); // Obtém todos os dados
 
-  const cabecalhos = dados[0];
-  const linhas = dados.slice(1);
+  // Obter as 3 planilhas separadas
+  const abaVoos = planilha.getSheetByName("PLANILHA_VOOS");
+  const abaConsoles = planilha.getSheetByName("PLANILHA_CONSOLES");
+  const abaControladores = planilha.getSheetByName("PLANILHA_CONTROLADORES");
 
+  // Obter os dados de cada planilha (ajustado para pegar apenas os dados numéricos)
+  const dadosVoos = abaVoos.getRange(254, 4, 10, abaVoos.lastColumn).getValues();
+  const dadosConsoles = abaConsoles.getRange(254, 4, 10, abaConsoles.lastColumn).getValues();
+  const dadosControladores = abaControladores.getRange(254, 4, 10, abaControladores.lastColumn).getValues();
+
+  // Criar um objeto para armazenar os dados organizados
   const dadosOrganizados = {};
 
   // Organizar dados por horário
-  linhas.forEach(linha => {
-    const horario = linha[cabecalhos.indexOf("Horario")]; // Ex: "0000", "0030", etc.
-    const voos = linha[cabecalhos.indexOf("Voos")];
-    const consoles = linha[cabecalhos.indexOf("Consoles")];
-    const controladores = linha[cabecalhos.indexOf("Controladores")];
+  dadosVoos.forEach((linhaVoos, index) => {
+    const horario = linhaVoos[0]; // Considerando que o horário está na primeira coluna (coluna 4 na planilha)
+    const voos = linhaVoos[1]; // Considerando que o número de voos está na segunda coluna
+    const consoles = dadosConsoles[index][1]; // Pegando os consoles da planilha de consoles
+    const controladores = dadosControladores[index][1]; // Pegando os controladores da planilha de controladores
 
     if (!dadosOrganizados[horario]) {
       dadosOrganizados[horario] = [];
@@ -26,10 +32,9 @@ function obterDadosAnuais() {
 }
 
 function executarAnalise() {
-    const dadosAnuais = obterDadosAnuais();
-    const resultados = calcularMediaRegressao(dadosAnuais);
-  
-    Logger.log("Média das regressões lineares para Consoles e Controladores:");
-    Logger.log(resultados);
-  }
-  
+  const dadosAnuais = obterDadosAnuais();
+  const resultados = calcularMediaRegressao(dadosAnuais);
+
+  Logger.log("Média das regressões lineares para Consoles e Controladores:");
+  Logger.log(resultados);
+}
