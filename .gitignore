@@ -4,6 +4,7 @@ JANEIRO
 NOVEMBRO
 Nova pasta
 dadosColetados.csv
+<<<<<<< HEAD
 Nova pasta
 ARQUIVOS GERADOS COM JAVASCRIPT
 PASTAPARAEXTRAIR
@@ -11,5 +12,8 @@ SOTS 2024 BackUp
 src
 node_modules
 
+=======
+janeiroSOTSetores.csv
+>>>>>>> 08f380bdd86880b5ce52e0e70e3b1315110b7214
 
 
