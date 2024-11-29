@@ -40,7 +40,7 @@ function processarArquivoCSV(caminhoArquivo) {
 
   const filtradosPorHorario = arrayStartingWith3And0.filter(linha => horariosPermitidos.includes(linha[2]));
 
-  const setoresSplit = filtradosPorHorario.map(linha => (linha[7] + linha[8]));
+  const setoresSplit = filtradosPorHorario.map(linha => parseInt(linha[7]) + parseInt(linha[8]));
 
   const linhaDeSetores = Array(horariosPermitidos.length).fill('');
   for (let i = 0; i < horariosPermitidos.length; i++) {
@@ -81,11 +81,11 @@ function adicionarPlanilhasDeDiretorio(diretorio) {
     const csv = json2csvParser.parse([dadosDia]);
 
     if (isPrimeiraLinha) {
-      fs.appendFileSync('janeiroSOTSetores.csv', csv + "\n", "utf8");
+      fs.appendFileSync('SOTControladores.csv', csv + "\n", "utf8");
       isPrimeiraLinha = false;
     } else {
       const csvSemHeader = csv.split("\n").slice(1).join("\n");
-      fs.appendFileSync('janeiroSOTSetores.csv', csvSemHeader + "\n", "utf8");
+      fs.appendFileSync('SOTControladores.csv', csvSemHeader + "\n", "utf8");
     }
   });
   console.log(`Arquivos do diretório ${diretorio} processados com sucesso!`);

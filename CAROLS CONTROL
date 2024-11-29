@@ -1,0 +1,87 @@
+function cadastrarNovo() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("INICIO");
+  var afastamentosSheet = ss.getSheetByName("AFASTAMENTOS");
+
+  // Obtém valores dos campos
+  var trigrama = sheet.getRange('D8').getValue();
+  var tipo = sheet.getRange('F8').getValue();
+  var dataInicial = new Date(sheet.getRange('J8').getValue());
+  var dataFinal = new Date(sheet.getRange('L8').getValue());
+  var descricao = sheet.getRange('E10:J10').getValue();
+  var dataCadastro = new Date();
+  var dataCadastroFormat = Utilities.formatDate(dataCadastro, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+
+  // Verifica se todos os campos obrigatórios foram preenchidos
+  if (!trigrama || !tipo || !dataInicial || !dataFinal || !descricao) {
+    SpreadsheetApp.getUi().alert("Preencha todos os dados obrigatórios.");
+    return;
+  }
+
+
+  // Determina a próxima linha disponível
+  var lastRow = sheet.getLastRow();
+  var linhaInicial = lastRow + 1;
+
+  // Insere os valores na planilha "INICIO"
+  sheet.getRange(linhaInicial, 2).setValue(trigrama);
+  sheet.getRange(linhaInicial, 3, 1, 2).merge().setValue(tipo);
+  sheet.getRange(linhaInicial, 5).setValue(dataInicial);
+  sheet.getRange(linhaInicial, 6).setValue(dataFinal);
+  sheet.getRange(linhaInicial, 7, 1, 5).merge().setValue(descricao);
+  sheet.getRange(linhaInicial, 12).setNumberFormat("dd/MM/yyyy");
+  sheet.getRange(linhaInicial, 12).setValue(dataCadastroFormat);
+  
+  console.log(dataCadastroFormat);
+
+  // Atualiza o ID na próxima linha
+  var ultimoID = parseInt(sheet.getRange(sheet.getLastRow(), 13).getValue(), 10) || 0;
+  var novoID = ultimoID + 1;
+  sheet.getRange(linhaInicial, 13).setValue(novoID);
+
+  // Limpa os campos preenchidos na planilha "INICIO"
+  sheet.getRange('D8:F8').clearContent();
+  sheet.getRange('J8:L8').clearContent();
+  sheet.getRange('E10:J10').clearContent();
+
+  // Preenche a planilha "AFASTAMENTOS"
+  var headerDias = afastamentosSheet.getRange(1, 2, 1, afastamentosSheet.getLastColumn() - 1).getValues()[0];
+
+  function localizarColunas(headerDias, targetDate) {
+    for (var i = 0; i < headerDias.length; i++) {
+      if (headerDias[i] && new Date(headerDias[i]).getTime() === targetDate.getTime()) {
+        return i + 2; // Retorna a coluna correspondente
+      }
+    }
+    return -1;
+  }
+
+  var colInicial = localizarColunas(headerDias, dataInicial);
+  var colFinal = localizarColunas(headerDias, dataFinal);
+
+  if (colInicial === -1 || colFinal === -1) {
+    SpreadsheetApp.getUi().alert("Uma ou ambas as datas não foram encontradas no cabeçalho.");
+    return;
+  }
+
+  var trigramaRow = afastamentosSheet.getRange("A:A").getValues().findIndex(row => row[0] === trigrama) + 1;
+
+  if (trigramaRow === 0) {
+    SpreadsheetApp.getUi().alert("Trigrama não encontrado na planilha AFASTAMENTOS.");
+    return;
+  }
+
+  var backgroundColor;
+  switch (tipo) {
+    case "AFASTAMENTO": backgroundColor = "#FFFF00"; break;
+    case "CURSO": backgroundColor = "#00FF00"; break;
+    case "MISSÃO": backgroundColor = "#0000FF"; break;
+    case "FÉRIAS": backgroundColor = "#FFA500"; break;
+    default: backgroundColor = "#FFFFFF"; break;
+  }
+
+  afastamentosSheet.getRange(trigramaRow, colInicial, 1, colFinal - colInicial + 1)
+    .setValue(descricao)
+    .setFontWeight("bold")
+    .setBackground(backgroundColor);
+}

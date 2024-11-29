@@ -1,0 +1,35 @@
+function obterDadosAnuais() {
+  const planilha = SpreadsheetApp.getActiveSpreadsheet();
+  const aba = planilha.getSheetByName("NOME_DA_ABA"); // Substitua pelo nome da aba
+  const dados = aba.getDataRange().getValues(); // Obtém todos os dados
+
+  const cabecalhos = dados[0];
+  const linhas = dados.slice(1);
+
+  const dadosOrganizados = {};
+
+  // Organizar dados por horário
+  linhas.forEach(linha => {
+    const horario = linha[cabecalhos.indexOf("Horario")]; // Ex: "0000", "0030", etc.
+    const voos = linha[cabecalhos.indexOf("Voos")];
+    const consoles = linha[cabecalhos.indexOf("Consoles")];
+    const controladores = linha[cabecalhos.indexOf("Controladores")];
+
+    if (!dadosOrganizados[horario]) {
+      dadosOrganizados[horario] = [];
+    }
+
+    dadosOrganizados[horario].push({ voos, consoles, controladores });
+  });
+
+  return dadosOrganizados;
+}
+
+function executarAnalise() {
+    const dadosAnuais = obterDadosAnuais();
+    const resultados = calcularMediaRegressao(dadosAnuais);
+  
+    Logger.log("Média das regressões lineares para Consoles e Controladores:");
+    Logger.log(resultados);
+  }
+  

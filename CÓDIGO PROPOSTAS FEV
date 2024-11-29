@@ -1,0 +1,48 @@
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('Index')
+      .setTitle('Proposta de Escala COAM - Fevereiro');
+}
+
+function enviarPropostaAppScript(trigrama, diasCadastrados, mesAtual) {
+  var ssFinal = SpreadsheetApp.openById('1p8UqzMR6ZjRx9LntnhNdftoSzJmvY0c0JBujOKxzOlk');
+  var planilhaFinal = ssFinal.getSheetByName('Propostas Enviadas');
+
+  if (!trigrama || !diasCadastrados || diasCadastrados.length === 0) {
+    return "Erro: Trigrama ou dias não fornecidos.";
+  }
+
+  var dadosFinal = planilhaFinal.getDataRange().getValues();
+  var linhaDestino = null;
+
+  // Encontrar a linha com o trigrama correspondente
+  for (var i = 0; i < dadosFinal.length; i++) {
+    if (dadosFinal[i][0] === trigrama) {
+      linhaDestino = i + 1; // Planilhas começam a contar da linha 1, não 0
+      break;
+    }
+  }
+
+  if (!linhaDestino) {
+    return "Erro: Trigrama não encontrado.";
+  }
+
+  diasCadastrados.forEach(function(dia) {
+  
+    var diaColuna = dia.dia + 1; // Se a primeira coluna de dias for a coluna 2 (dia 1)
+    
+  
+    var colunaDestino = diaColuna;  // O número do dia corresponde à coluna na planilha
+
+    planilhaFinal.getRange(linhaDestino, colunaDestino).setValue(dia.opcao);
+  });
+  
+  var ultimaColuna = planilhaFinal.getLastColumn();
+  var dataCadastro = new Date();
+  var dataCadastroFormatada = Utilities.formatDate(dataCadastro, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+  planilhaFinal.getRange(linhaDestino, ultimaColuna).setValue(dataCadastroFormatada);
+
+  return "Proposta enviada com sucesso!";
+
+
+}
+
