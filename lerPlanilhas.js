@@ -4,7 +4,7 @@ const xlsx = require('xlsx');
 const { Parser } = require('json2csv');
 
 //const diretorio = path.join(__dirname, '/data/05 MAIO 2024');
-fs.readdirSync("./data").forEach(diretorio =>adicionarUmaplanilha(`./data/${diretorio}`))
+fs.readdirSync("./pastaParaExtrações").forEach(diretorio =>adicionarUmaplanilha(`./pastaParaExtrações/${diretorio}`))
 
 
 function adicionarUmaplanilha(diretorio){

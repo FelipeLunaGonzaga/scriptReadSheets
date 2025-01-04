@@ -1,11 +1,172 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadastro de Propostas</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f0f4f8;
+      color: #333;
+    }
+    .container {
+      max-width: 900px;
+      margin: 50px auto;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+    header {
+      background: #007BFF;
+      color: white;
+      padding: 15px 20px;
+      text-align: center;
+      font-size: 1.5em;
+    }
+    .content {
+      padding: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+    select, input[type="text"], textarea {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      background-color: #007BFF;
+      color: white;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1em;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .dias {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+    .dia {
+      width: 13%;
+      margin-bottom: 10px;
+      text-align: center;
+      padding: 10px;
+      background-color: #f9f9f9;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    .dia select {
+      width: 100%;
+      padding: 5px;
+    }
+    .dia span {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    .success {
+      color: green;
+      font-weight: bold;
+      text-align: center;
+      margin-top: 15px;
+    }
+  </style>
 </head>
 <body>
-    
+  <div class="container">
+    <header>Cadastro de Propostas - FEVEREIRO</header>
+    <div class="content">
+      <form id="propostaForm">
+        <label for="trigrama">Trigrama:</label>
+        <select id="trigrama" onchange="validarTrigrama()">
+          <option value="">Selecione um trigrama</option>
+          <option value="MRN">MRN</option>
+          <option value="LUZ">LUZ</option>
+          <option value="CAR">CAR</option>
+          <option value="GAH">GAH</option>
+          <option value="ELS">ELS</option>
+          <option value="FBI">FBI</option>
+          <option value="MES">MES</option>
+          <option value="SOB">SOB</option>
+        </select>
+
+        <label for="dias">Insira a proposta abaixo:</label>
+        <div class="dias" id="dias">
+          <!-- Blocos de dias serão preenchidos dinamicamente -->
+        </div>
+
+        <!-- Botão que chama a função enviarPropostaAppScript -->
+        <button type="button" onclick="enviarProposta()">Enviar Proposta</button>
+      </form>
+
+      <div id="responseMessage" class="success"></div>
+    </div>
+  </div>
+
+  <script>
+    // Dados dos dias de fevereiro
+    const diasFevereiro = Array.from({ length: 28 }, (_, i) => i + 1);
+    const diasSemana = [
+      'Sábado', 'Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta',
+      'Sábado', 'Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta',
+      'Sábado', 'Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta',
+      'Sábado', 'Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'
+    ];
+
+    const opcoesMenu = ['M', 'T', 'P', 'R', 'R2', 'M/P', 'A', 'RES', 'IN', 'TACF', 'MIS', 'CUR'];
+
+    // Preencher os blocos de dias
+    const diasContainer = document.getElementById('dias');
+
+    diasFevereiro.forEach((dia, index) => {
+      const diaDiv = document.createElement('div');
+      diaDiv.classList.add('dia');
+      diaDiv.innerHTML = `
+        <span>${dia} - ${diasSemana[index]}</span>
+        <select id="proposta${dia}">
+          <option value="">Selecione</option>
+          ${opcoesMenu.map(opcao => `<option value="${opcao}">${opcao}</option>`).join('')}
+        </select>
+      `;
+      diasContainer.appendChild(diaDiv);
+    });
+
+    // Enviar proposta
+    function enviarProposta() {
+      const trigrama = document.getElementById('trigrama').value;
+      const diasCadastrados = [];
+
+      // Captura os valores dos menus suspensos
+      diasFevereiro.forEach((dia, index) => {
+        const select = document.querySelector(`#dias .dia:nth-child(${index + 1}) select`);
+        const opcao = select.value;
+        if (opcao) diasCadastrados.push({ dia, opcao });
+      });
+
+      if (!trigrama) {
+        document.getElementById('responseMessage').innerText = "VOCÊ NÃO PREENCHEU O TRIGRAMA, QUERIDO!";
+        return;
+      }
+
+      // Envia para o Apps Script
+      google.script.run.withSuccessHandler(function(response) {
+        document.getElementById('responseMessage').innerText = response;
+        document.getElementById('propostaForm').reset();
+      }).enviarPropostaAppScript(trigrama, diasCadastrados);
+    }
+  </script>
 </body>
 </html>
