@@ -1,0 +1,95 @@
+function cadastrarNovo() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("INICIO");
+  var afastamentosSheet = ss.getSheetByName("AFASTAMENTOS");
+
+  var trigrama = sheet.getRange('D8').getValue();
+  var tipo = sheet.getRange('F8').getValue();
+  var dataInicial = new Date(sheet.getRange('J8').getValue());
+  var dataFinal = new Date(sheet.getRange('L8').getValue());
+  var descricao = sheet.getRange('E10:J10').getValue();
+
+  // Verifica se todos os campos obrigatórios foram preenchidos
+  if (!trigrama || !tipo || !dataInicial || !dataFinal || !descricao) {
+    SpreadsheetApp.getUi().alert("Preencha todos os dados obrigatórios.");
+    return;
+  }
+
+
+  var idCell = sheet.getRange(linhaInicial, 13); 
+  var idFunc = parseInt(idCell.getValue(), 10) || 1;  
+  var linhaInicial = 18 + (idFunc - 1);  
+
+  // Insere os valores na planilha "INICIO"
+  var ranges = [
+    sheet.getRange(linhaInicial, 2).setValue(trigrama),
+    sheet.getRange(linhaInicial, 3, 1, 2).merge().setValue(tipo),
+    sheet.getRange(linhaInicial, 5).setValue(dataInicial),
+    sheet.getRange(linhaInicial, 6).setValue(dataFinal),
+    sheet.getRange(linhaInicial, 7, 1, 5).merge().setValue(descricao)
+  ];
+
+  // Aplica formatação aos dados inseridos
+  ranges.forEach(function (range) {
+    range.setBackground('#FFFFFF')
+      .setBorder(true, true, true, true, true, true, '#000000', SpreadsheetApp.BorderStyle.SOLID)
+      .setVerticalAlignment("middle")
+      .setHorizontalAlignment("center");
+  });
+
+  // Atualiza o valor do ID para o próximo
+  idCell.setValue(idFunc + 1)
+    .setBackground('#FFFFFF')
+    .setBorder(true, true, true, true, true, true, '#000000', SpreadsheetApp.BorderStyle.SOLID)
+    .setVerticalAlignment("middle")
+    .setHorizontalAlignment("center");
+
+  // Limpa os campos da planilha "INICIO"
+  sheet.getRange('D8:F8').clearContent();
+  sheet.getRange('J8:L8').clearContent();
+  sheet.getRange('E10:J10').clearContent();
+
+  // Inserção em "AFASTAMENTOS"
+  var headerDias = afastamentosSheet.getRange(1, 2, 1, afastamentosSheet.getLastColumn() - 1).getValues()[0];
+
+  // Função para localizar as colunas de acordo com as datas
+  function localizarColunas(headerDias, targetDate) {
+    for (var a = 0; a < headerDias.length; a++) {
+      var currentDate = headerDias[a];
+      if (currentDate && new Date(currentDate).getTime() === targetDate.getTime()) {
+        return a + 2;  // Retorna a coluna onde a data corresponde
+      }
+    }
+    return -1;  // Retorna -1 caso a data não seja encontrada
+  }
+
+  var colInicial = localizarColunas(headerDias, dataInicial);
+  var colFinal = localizarColunas(headerDias, dataFinal);
+
+  var trigramaRange = afastamentosSheet.getRange("A:A").getValues();
+  var trigramaRow = trigramaRange.findIndex(row => row[0] === trigrama) + 1;  // Encontra a linha do trigrama
+
+  if (trigramaRow === 0) {
+    SpreadsheetApp.getUi().alert("Trigrama não encontrado na planilha AFASTAMENTOS.");
+    return;
+  }
+
+  // Determina a cor de fundo com base no tipo de afastamento
+  var backgroundColor;
+  switch (tipo) {
+    case "AFASTAMENTO": backgroundColor = "#FFFF00"; break;
+    case "CURSO": backgroundColor = "#00FF00"; break;
+    case "MISSÃO": backgroundColor = "#0000FF"; break;
+    case "FÉRIAS": backgroundColor = "#FFA500"; break;
+    default: backgroundColor = "#FFFFFF"; break;
+  }
+
+  // Insere os dados na planilha "AFASTAMENTOS" na linha correspondente
+  afastamentosSheet
+    .getRange(trigramaRow, colInicial, 1, colFinal - colInicial + 1)
+    .setValue(descricao)
+    .setFontWeight("bold")
+    .setBackground(backgroundColor);
+
+    idFunc
+}

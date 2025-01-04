@@ -1,53 +1,125 @@
+const puppeteer = require('puppeteer-core');
 const fs = require('fs');
+
+// Função para capturar o Bearer Token
+async function getBearerToken(url, email, password) {
+    let browser;
+    try {
+        const edgePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+
+        browser = await puppeteer.launch({
+            executablePath: edgePath,
+            headless: false,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        });
+
+        const page = await browser.newPage();
+        let bearerToken = null;
+
+        // Promessa para capturar o token
+        const tokenCaptured = new Promise((resolve, reject) => {
+            page.on('request', (request) => {
+                const headers = request.headers();
+                if (headers['authorization'] && headers['authorization'].startsWith('Bearer ')) {
+                    bearerToken = headers['authorization'].replace('Bearer ', '');
+                    resolve(bearerToken);
+                }
+            });
+        });
+
+        console.log('Acessando página de login...');
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
+
+        await page.waitForSelector('input[placeholder="Digite a senha cadastrada"]', { timeout: 10000 });
+
+        console.log('Preenchendo e-mail...');
+        await page.type('input[placeholder="Digite o nome de usuário cadastrado"]', email, { delay: 100 });
+
+        console.log('Preenchendo senha...');
+        await page.type('input[placeholder="Digite a senha cadastrada"]', password, { delay: 100 });
+
+        console.log('Realizando login...');
+        await Promise.all([
+            page.click('button.v-button.submit[data-test="login-submit-button"]'),
+            page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }),
+        ]);
+
+        console.log('Login realizado. Aguardando captura do token...');
+        await tokenCaptured; // Aguarda o token ser capturado
+
+        if (bearerToken) {
+            console.log('Bearer Token capturado:', bearerToken);
+        } else {
+            throw new Error('Bearer não encontrado nos cabeçalhos das requisições.');
+        }
+
+        //await browser.close();
+        return bearerToken;
+    } catch (error) {
+        console.error('Erro ao coletar Bearer ou realizar a tarefa:', error);
+        if (browser) await browser.close();
+    }
+}
 
 // Função principal
 async function coletarDadosDemandas() {
-    const token = 'efb944e7-d4c5-4289-b1d8-9e738766b17f';
-    const urlsPorDia = gerarDatasComLinks();
-    const horarios = gerarHorarios();
+    try {
+        // Garante que o token será coletado antes de prosseguir
+        const token = await getBearerToken(
+            'https://sigma.decea.mil.br/sigma-ui/login',
+            'lunaflg',
+            '01I@mmanm'
+        );
 
-    for (const { date, urlDiaEspecifico } of urlsPorDia) {
-        const horariosLinha = [];
-        const voosLinha = [];
+        console.log('Token coletado:', token);
 
-        try {
-            console.log(`Processando data: ${date}`);
-            console.time(`Tempo para processar ${date}`);
+        const urlsPorDia = gerarDatasComLinks();
+        const horarios = gerarHorarios();
 
-            // Passo 1: Obter o ID da página
-            const idEspecifico2 = await obterIdPagina(urlDiaEspecifico, token);
+        for (const { date, urlDiaEspecifico } of urlsPorDia) {
+            var horariosLinha = [];
+            var voosLinha = [];
 
-            // Passo 2: Obter o ID SBRE
-            const idSBRE = await obterIdSbre(idEspecifico2, token);
+            try {
+                console.log(`Processando data: ${date}`);
+                console.time(`Tempo para processar ${date}`);
 
-            const baseURLFinal = `https://sigma.decea.mil.br/sigma-api/v1/sessions/HISTORICAL/${idEspecifico2}/regulatedElementOfSession/${idSBRE}/flightIntentions`;
+                var idEspecifico2 = await obterIdPagina(urlDiaEspecifico, token);
+                console.log(`O ID específico é: ${idEspecifico2}`);
 
-            // Passo 3: Requisição por intervalos
-            for (const intervalo of horarios) {
-                const url = `${baseURLFinal}?page=1&size=10&capacityType=declared&operationTypeDemandChart=TOTAL&sessionInterval=THIRTY_MINUTES&beginTime=${intervalo.begin}&endTime=${intervalo.end}&levelGE=F150&narrowSearch=false&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE&flightPlanStates=ONGOING_TER`;
+                var idSBRE = await obterIdSbre(idEspecifico2, token);
+                console.log(`O ID SBRE é: ${idSBRE}`);
 
-                try {
-                    const numeroDeVoos = await obterVoosIntervalo(url, token, intervalo);
-                    console.log(`Data ${date}, intervalo ${intervalo.begin} - ${intervalo.end}: ${numeroDeVoos} voos`);
+                var baseURLFinal = `https://sigma.decea.mil.br/sigma-api/v1/sessions/HISTORICAL/${idEspecifico2}/regulatedElementOfSession/${idSBRE}/flightIntentions`;
 
-                    horariosLinha.push(`${intervalo.begin} - ${intervalo.end}`);
-                    voosLinha.push(numeroDeVoos);
-                } catch (err) {
-                    console.error(`Erro no intervalo ${intervalo.begin} - ${intervalo.end}: ${err.message}`);
+                for (const intervalo of horarios) {
+                    var url = `${baseURLFinal}?page=1&size=10&capacityType=declared&operationTypeDemandChart=TOTAL&sessionInterval=THIRTY_MINUTES&beginTime=${intervalo.begin}&endTime=${intervalo.end}&levelGE=F150&narrowSearch=false&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE&flightPlanStates=ONGOING_TER`;
+
+                    try {
+                        var numeroDeVoos = await obterVoosIntervalo(url, token, intervalo);
+                        console.log(`Data ${date}, intervalo ${intervalo.begin} - ${intervalo.end}: ${numeroDeVoos} voos`);
+
+                        horariosLinha.push(`${intervalo.begin} - ${intervalo.end}`);
+                        voosLinha.push(numeroDeVoos);
+                    } catch (err) {
+                        console.error(`Erro no intervalo ${intervalo.begin} - ${intervalo.end}: ${err.message}`);
+                    }
                 }
-            }
 
-            salvarComoCSV(date, horariosLinha, voosLinha);
-            console.timeEnd(`Tempo para processar ${date}`);
-        } catch (err) {
-            console.error(`Erro ao processar a data ${date}: ${err.message}`);
+                salvarComoCSV(date, horariosLinha, voosLinha);
+                console.timeEnd(`Tempo para processar ${date}`);
+            } catch (err) {
+                console.error(`Erro ao processar a data ${date}: ${err.message}`);
+            }
         }
+    } catch (error) {
+        console.error('Erro na coleta de dados:', error.message);
     }
 }
 
 // Função para obter o ID da página
 async function obterIdPagina(url, token) {
-    const resposta = await fetch(url, {
+    var resposta = await fetch(url, {
         method: 'GET',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -59,39 +131,49 @@ async function obterIdPagina(url, token) {
         throw new Error(`Erro ao obter ID da página: ${resposta.statusText}`);
     }
 
-    const dados = await resposta.json();
+    var dados = await resposta.json();
     return dados.content && dados.content.length > 0 ? dados.content[0].id : null;
 }
 
 // Função para obter o ID SBRE
 async function obterIdSbre(idEspecifico, token) {
-    const url = `https://sigma.decea.mil.br/sigma-api/v1/sessions/HISTORICAL/${idEspecifico}/regulatedElementOfSession/dashboard?page=1&size=8&regulatedType=FIR_SECTOR_GROUP&name=SBRE&sessionInterval=THIRTY_MINUTES&fullSearch=false&status=NORMAL,CONGESTION,SATURATION&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE`;
+    var urls = [
+        `https://sigma.decea.mil.br/sigma-api/v1/sessions/HISTORICAL/${idEspecifico}/regulatedElementOfSession/dashboard?page=1&size=8&regulatedType=FIR_SECTOR_GROUP&name=SBRE&sessionInterval=THIRTY_MINUTES&fullSearch=false&status=NORMAL,CONGESTION,SATURATION&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE`,
+        `https://sigma.decea.mil.br/sigma-api/v1/sessions/HISTORICAL/${idEspecifico}/regulatedElementOfSession/dashboard?page=2&size=8&regulatedType=FIR_SECTOR_GROUP&name=SBRE&sessionInterval=THIRTY_MINUTES&fullSearch=false&status=NORMAL,CONGESTION,SATURATION&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE`
+    ];
 
-    const resposta = await fetch(url, {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-    });
+    for (var url of urls) {
+        try {
+            var resposta = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
 
-    if (!resposta.ok) {
-        throw new Error(`Erro ao obter ID SBRE: ${resposta.statusText}`);
+            if (!resposta.ok) {
+                console.error(`Erro ao acessar URL: ${url} - Status: ${resposta.statusText}`);
+                continue;
+            }
+
+            var dados = await resposta.json();
+            var objetoSBRE = dados.content.find((obj) => obj.name === "SBRE");
+
+            if (objetoSBRE) {
+                return objetoSBRE.id;
+            }
+        } catch (error) {
+            console.error(`Erro ao buscar ID SBRE na URL: ${url} - Erro: ${error.message}`);
+        }
     }
 
-    const dados = await resposta.json();
-    const objetoSBRE = dados.content.find((obj) => obj.name === "SBRE");
-
-    if (!objetoSBRE) {
-        throw new Error('ID SBRE não encontrado.');
-    }
-
-    return objetoSBRE.id;
+    throw new Error('ID SBRE não encontrado em nenhuma das páginas.');
 }
 
 // Função para obter número de voos em um intervalo
 async function obterVoosIntervalo(url, token, intervalo) {
-    const resposta = await fetch(url, {
+    var resposta = await fetch(url, {
         method: 'GET',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -103,7 +185,7 @@ async function obterVoosIntervalo(url, token, intervalo) {
         throw new Error(`Erro na requisição do intervalo ${intervalo.begin} - ${intervalo.end}: ${resposta.statusText}`);
     }
 
-    const dados = await resposta.json();
+    var dados = await resposta.json();
     return dados.totalElements || 0;
 }
 
@@ -122,8 +204,8 @@ function gerarHorarios() {
 // Gerar datas com links para URLs
 function gerarDatasComLinks() {
     const links = [];
-    const startDate = new Date('2024-01-01');
-    const endDate = new Date('2024-01-31');
+    const startDate = new Date('2024-11-03');
+    const endDate = new Date('2025-01-01');
 
     while (startDate <= endDate) {
         const year = startDate.getFullYear();
@@ -139,10 +221,13 @@ function gerarDatasComLinks() {
     return links;
 }
 
-// Salvar dados em CSV
+// Salvar como CSV
 function salvarComoCSV(date, horariosLinha, voosLinha) {
-    const csvContent = 'Horários,Voos\n' +
-        horariosLinha.map((horario, index) => `${horario},${voosLinha[index]}`).join('\n');
+    const csvContent = [
+        horariosLinha.join(','),
+        voosLinha.join(',')
+    ].join('\n');
+
     fs.writeFileSync(`dados_demandas_${date}.csv`, csvContent, 'utf8');
     console.log(`Arquivo CSV salvo como "dados_demandas_${date}.csv"`);
 }

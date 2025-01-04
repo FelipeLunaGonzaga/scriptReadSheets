@@ -1,0 +1,73 @@
+const { Telegraf } = require('telegraf');
+const axios = require('axios');
+const cheerio = require('cheerio');
+const { createCanvas, loadImage } = require('canvas');
+const fs = require('fs');
+
+const bot = new Telegraf('8101835035:AAEf_OTISnyMdcHGJd1TIlH2iORNdB5cKuA'); // Substitua pelo token do Bot
+
+async function getProductInfo(url) {
+    try {
+        const response = await axios.get(url);
+        const $ = cheerio.load(response.data);
+        const title = $('h1.product-title').text(); // Ajuste conforme o HTML da Shopee
+        const price = $('div.product-price').text();
+        const imageUrl = $('img.product-image').attr('src');
+        return { title, price, imageUrl };
+    } catch (error) {
+        console.error('Erro ao coletar informações do produto:', error);
+        return null;
+    }
+}
+
+async function createProductImage(product) {
+    const canvas = createCanvas(800, 600);
+    const ctx = canvas.getContext('2d');
+    const productImage = await loadImage(product.imageUrl);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 800, 600);
+    ctx.drawImage(productImage, 50, 50, 300, 300);
+
+    ctx.font = 'bold 30px Arial';
+    ctx.fillStyle = '#000000';
+    ctx.fillText(product.title, 50, 400);
+    ctx.fillText(`Preço: ${product.price}`, 50, 450);
+
+    return canvas.toBuffer();
+}
+
+async function enviarImagemParaWix(productInfo, imageBuffer) {
+    const base64Image = imageBuffer.toString('base64');
+    try {
+        const response = await axios.post('https://seusite.wixsite.com/_functions/adicionarImagem', {
+            title: productInfo.title,
+            price: productInfo.price,
+            imageUrl: base64Image,
+        });
+        console.log('Imagem enviada para o Wix:', response.data);
+    } catch (error) {
+        console.error('Erro ao enviar imagem para o Wix:', error);
+    }
+}
+
+bot.start((ctx) => ctx.reply('Olá! Envie um link de produto para começar.'));
+
+bot.on('text', async (ctx) => {
+    const link = ctx.message.text;
+    if (link.includes('http')) {
+        ctx.reply('Processando o link...');
+        const productInfo = await getProductInfo(link);
+        if (productInfo) {
+            const imageBuffer = await createProductImage(productInfo);
+            await enviarImagemParaWix(productInfo, imageBuffer);
+            ctx.reply('A imagem foi processada e enviada ao site Wix!');
+        } else {
+            ctx.reply('Não consegui processar o link. Tente novamente.');
+        }
+    } else {
+        ctx.reply('Por favor, envie um link válido.');
+    }
+});
+
+bot.launch();
