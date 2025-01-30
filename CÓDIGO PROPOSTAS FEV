@@ -1,48 +1,57 @@
-function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
-      .setTitle('Proposta de Escala COAM - Fevereiro');
+function coletarDados() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetRespostas = ss.getSheetByName("RESPOSTA MENSAL DE INDICADORES");
+  var sheetForm = ss.getSheetByName("FORMULÁRIO DE ENVIO DE INDICADORES");
+
+  // Captura de valores no formulário
+  var kpi = sheetForm.getRange('E6').getDisplayValue();
+  var local = sheetForm.getRange('M6').getDisplayValue();
+  var kpiValue = sheetForm.getRange('I12').getDisplayValue();
+  var obs = sheetForm.getRange('E18').getDisplayValue();
+
+  // Captura de todos os dados da planilha de respostas
+  var localDatas = sheetRespostas.getDataRange().getValues();
+
+  var foundTable = false;
+  var localColumn = -1;
+  var localLine = -1;
+
+  // Percorre todas as linhas da planilha
+  for (var rowIndex = 0; rowIndex < localDatas.length; rowIndex++) {
+      var row = localDatas[rowIndex];
+
+      // Busca pela coluna correspondente ao local
+      for (var colIndex = 0; colIndex < row.length; colIndex++) {
+          if (row[colIndex] === local) {
+              localColumn = colIndex + 1; // +1 porque getRange começa em 1
+              foundTable = true;
+              break;
+          }
+      }
+
+      // Se encontrou a tabela correta, busca pela linha do KPI
+      if (foundTable) {
+          for (var kpiIndex = rowIndex + 1; kpiIndex < localDatas.length; kpiIndex++) {
+              if (localDatas[kpiIndex][0] === kpi) {
+                  localLine = kpiIndex + 1; // +1 porque getRange começa em 1
+                  break;
+              }
+          }
+          break;
+      }
+  }
+
+  // Verificação de erros
+  if (!foundTable || localColumn === -1) {
+      SpreadsheetApp.getUi().alert("Localidade não encontrada.");
+      return;
+  }
+  if (localLine === -1) {
+      SpreadsheetApp.getUi().alert("KPI não encontrado.");
+      return;
+  }
+
+  // Atualização dos valores
+  sheetRespostas.getRange(localLine, localColumn).setValue(kpiValue);
+  sheetRespostas.getRange(localLine, localColumn + 1).setValue(obs);
 }
-
-function enviarPropostaAppScript(trigrama, diasCadastrados, mesAtual) {
-  var ssFinal = SpreadsheetApp.openById('1p8UqzMR6ZjRx9LntnhNdftoSzJmvY0c0JBujOKxzOlk');
-  var planilhaFinal = ssFinal.getSheetByName('Propostas Enviadas');
-
-  if (!trigrama || !diasCadastrados || diasCadastrados.length === 0) {
-    return "Erro: Trigrama ou dias não fornecidos.";
-  }
-
-  var dadosFinal = planilhaFinal.getDataRange().getValues();
-  var linhaDestino = null;
-
-  // Encontrar a linha com o trigrama correspondente
-  for (var i = 0; i < dadosFinal.length; i++) {
-    if (dadosFinal[i][0] === trigrama) {
-      linhaDestino = i + 1; // Planilhas começam a contar da linha 1, não 0
-      break;
-    }
-  }
-
-  if (!linhaDestino) {
-    return "Erro: Trigrama não encontrado.";
-  }
-
-  diasCadastrados.forEach(function(dia) {
-  
-    var diaColuna = dia.dia + 1; // Se a primeira coluna de dias for a coluna 2 (dia 1)
-    
-  
-    var colunaDestino = diaColuna;  // O número do dia corresponde à coluna na planilha
-
-    planilhaFinal.getRange(linhaDestino, colunaDestino).setValue(dia.opcao);
-  });
-  
-  var ultimaColuna = planilhaFinal.getLastColumn();
-  var dataCadastro = new Date();
-  var dataCadastroFormatada = Utilities.formatDate(dataCadastro, Session.getScriptTimeZone(), 'dd/MM/yyyy');
-  planilhaFinal.getRange(linhaDestino, ultimaColuna).setValue(dataCadastroFormatada);
-
-  return "Proposta enviada com sucesso!";
-
-
-}
-

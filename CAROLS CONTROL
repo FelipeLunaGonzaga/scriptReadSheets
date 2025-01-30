@@ -18,7 +18,6 @@ function cadastrarNovo() {
     return;
   }
 
-
   // Determina a próxima linha disponível
   var lastRow = sheet.getLastRow();
   var linhaInicial = lastRow + 1;

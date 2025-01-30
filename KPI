@@ -1,0 +1,160 @@
+var ss = SpreadsheetApp.getActiveSpreadsheet();
+var sheet = ss.getSheetByName("PDF - INFORMATIVO MENSAL ATM");
+
+function coletarSumario() {
+  // Coleta os dados da planilha
+  var dadosSumario = sheet.getRange(52, 1, 43, 6).getValues();
+  var dadosFiltrados = [];
+  
+  // Filtra as linhas que não estão completamente vazias
+  for (var i = 0; i < dadosSumario.length; i++) {
+    var linhaFiltrada = dadosSumario[i].filter(function(cell) {
+      return cell !== "";
+    });
+    if (linhaFiltrada.length > 0) {
+      dadosFiltrados.push(dadosSumario[i]); // Adiciona a linha completa
+    }
+  }
+  
+  console.log(dadosFiltrados);
+  return dadosFiltrados;
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function extrairPrimeirosNumeros() {
+  var dadosFiltrados = coletarSumario();
+  var numerosExtraidos = [];
+  
+  // Itera sobre as linhas e extrai o primeiro número antes de espaços ou pontos
+  dadosFiltrados.forEach(function(item) {
+    var texto = item[0]; // Primeiro valor da linha
+    if (texto) {
+      var numero = texto.match(/^\d+(\.\d+)?/); // Extrai somente o número inicial
+      if (numero) {
+        numerosExtraidos.push(numero[0]); // Adiciona o número extraído ao array
+      }
+    }
+  });
+  Logger.log(numerosExtraidos);
+  return numerosExtraidos;
+}
+
+
+// A BRINCADEIRA COMEÇA AQUI ------------------------------------------------------------------------------------------------
+
+function adicionarSumario() {
+  try {
+    const numerosExtraidos = extrairPrimeirosNumeros();
+    const dadosFiltrados = coletarSumario();
+    let index = 0; // Inicia o índice
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("PDF - INFORMATIVO MENSAL ATM");
+    const sheetResp = ss.getSheetByName("RESPOSTA MENSAL DE INDICADORES");
+
+    numerosExtraidos.forEach(function (numero) {
+      try {
+        if (numero === "1" || numero === "1.1") {
+          const pagina = (46 * 3) + (index * 2) + 3; // Calcula a página com base no índice
+          sheet.getRange(pagina, 1).setValue(dadosFiltrados[index][0]);
+
+          if (dadosFiltrados[index][0] === "1.1 KPA PREVISIBILIDADE") {
+            sheet.getRange(pagina + 2, 1).setRichTextValue(
+              SpreadsheetApp.newRichTextValue()
+                .setText("1.1.1 PONTUALIDADE DE PARTIDA EM SBRF (KPI 01)")
+                .setTextStyle(0, 5, SpreadsheetApp.newTextStyle().setBold(true).build()) // Aplica negrito em "1.1.1"
+                .build()
+            );
+
+            // KPI 01 ---------------------------------------------------------------------------------
+try {
+  const dadosKPI01 = coletarDadosSemAutenticacao("KPI 01", "TWR-RF");
+  if (!dadosKPI01 || !dadosKPI01.linha || !dadosKPI01.coluna) {
+    throw new Error("Erro: KPI 01 ou localidade não encontrados.");
+  }
+
+  const dadosImagemKPI01 = sheetResp.getRange(dadosKPI01.linha, dadosKPI01.coluna + 2).getValue();
+  if (dadosImagemKPI01) {
+    const enderecoRange01 = `B${pagina + 4}`;
+    
+    // Definindo a função assíncrona para inserir a imagem
+    async function processarImagem() {
+      await inserirImagemProporcional(enderecoRange01, dadosImagemKPI01);
+      const linhaBase = await obterLinhaBaseImagem();  // Função para obter a linha base
+      if (linhaBase !== null) {
+        Logger.log(`Linha base da imagem inserida: ${linhaBase}`);
+      } else {
+        Logger.log("Erro ao obter a linha base da imagem.");
+      }
+    }
+    processarImagem();  // Chamando a função assíncrona
+  }
+} catch (error) {
+  Logger.log(error.message);
+}
+
+            // KPI 14 ---------------------------------------------------------------------------------
+            try {
+              const dadosKPI14 = coletarDadosSemAutenticacao("KPI 14", "TWR-RF");
+              if (!dadosKPI14 || !dadosKPI14.linha || !dadosKPI14.coluna) {
+                throw new Error("Erro: KPI 14 ou localidade não encontrados.");
+              }
+
+              const dadosImagemKPI14 = sheetResp.getRange(dadosKPI14.linha, dadosKPI14.coluna + 2).getValue();
+              if (dadosImagemKPI14) {
+                const linhaFinal14 = sheet.getLastRow() + 2; // Garante espaço para o próximo item
+                const enderecoRange14 = `B${linhaFinal14}`;
+                inserirImagemProporcional(enderecoRange14, dadosImagemKPI14);
+                Logger.log(`Imagem inserida com sucesso para KPI 14! Linha do KPI01 é: ${dadosKPI14.linha} e a coluna é: ${dadosKPI14.coluna}`);
+              }
+
+              const dadosObsKPI14 = sheetResp.getRange(dadosKPI14.linha, dadosKPI14.coluna + 1).getValue();
+              if (dadosObsKPI14) {
+                sheet.getRange(pagina + 33, 1, 1, 7).setValue(dadosObsKPI14).setHorizontalAlignment("center").setWrap(true).merge();
+                Logger.log("Obs inserida para KPI 14: " + dadosObsKPI14);
+              } else {
+                Logger.log("Observação não encontrada para KPI 14.");
+              }
+            } catch (error) {
+              Logger.log("Erro ao processar KPI 14: " + error.message);
+            }
+
+
+
+
+          }
+        }
+      } catch (error) {
+        Logger.log("Erro ao processar número: " + numero + ", mensagem: " + error.message);
+      }
+      index++; // Incrementa o índice
+    });
+  } catch (error) {
+    Logger.log("Erro geral no método adicionarSumario: " + error.message);
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function abrirFormulario() {
+  var htmlOutput = HtmlService.createHtmlOutputFromFile('uploadForm')
+    .setWidth(400)
+    .setHeight(300);
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Faça o upload da imagem');
+}
+
+
+
