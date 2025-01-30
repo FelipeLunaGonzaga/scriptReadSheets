@@ -1,0 +1,68 @@
+const puppeteer = require('puppeteer-core'); // Usamos puppeteer-core para especificar o binário do Edge.
+
+async function getBearerToken(url, email, password) {
+    let browser;
+    try {
+        // Caminho para o binário do Microsoft Edge
+        const edgePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+
+        browser = await puppeteer.launch({
+            executablePath: edgePath, // Especifica o caminho do Edge
+            headless: false,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+
+        const page = await browser.newPage();
+
+        // Interceptar as requisições para capturar o Bearer
+        let bearerToken = null;
+        page.on('response', (response) => {
+            const url = response.url();
+            const headers = response.headers();
+            if (url.includes('health-check') && headers['authorization']) {
+                bearerToken = headers['authorization'].replace('Bearer ', ''); // Extrai o Bearer
+                console.log('Bearer capturado:', bearerToken);
+            }
+        });
+
+        // Acessar a página de login
+        console.log('Acessando página de login...');
+        await page.goto(url, { waitUntil: 'networkidle2' });
+
+        // Preencher os campos de login
+        console.log('Preenchendo e-mail e senha...');
+        await page.type('input[name="login"]', email, { delay: 100 });
+        await page.type('input[name="password"]', password, { delay: 100 });
+
+        // Tentar localizar o botão de login e clicar
+        console.log('Realizando login...');
+        const loginButton = await page.waitForSelector('button[type="submit"]', { timeout: 5000 });
+        await loginButton.click();
+
+        // Esperar navegação após login
+        await page.waitForNavigation({ waitUntil: 'networkidle2' });
+        console.log('Login realizado com sucesso.');
+
+        // Verificar se o Bearer foi capturado
+        if (!bearerToken) {
+            throw new Error('Bearer não encontrado nos cabeçalhos de resposta.');
+        }
+
+        console.log('Bearer Token capturado:', bearerToken);
+
+        // Você pode usar o Bearer token para fazer outras requisições ou acessar APIs aqui
+
+        await browser.close();
+    } catch (error) {
+        console.error('Erro ao coletar Bearer ou realizar a tarefa:', error);
+        if (browser) await browser.close();
+    }
+}
+
+// Exemplo de uso
+getBearerToken(
+    'https://sigma.decea.mil.br/sigma-ui/login',
+    'lunaflg',  // Substitua pelo seu email
+    '01I@mmanm'  // Substitua pela sua senha
+).then(() => console.log('Processo concluído.'))
+  .catch(error => console.error(error));

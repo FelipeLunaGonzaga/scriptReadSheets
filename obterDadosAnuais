@@ -1,3 +1,70 @@
+function calcularRegressaoLinear() {
+    const planilha = SpreadsheetApp.getActiveSpreadsheet();
+  
+    // Obter as planilhas
+    const abaVoos = planilha.getSheetByName("OUT VOOS SIGMA");
+    const abaConsoles = planilha.getSheetByName("SOT - ABERTURA DE CONSOLES - 2024");
+    const abaControladores = planilha.getSheetByName("(PLANILHA X) - CONTROLADORES NA POSIÇÃO - 2024");
+  
+    // Obter os horários e os dados de voos, consoles e controladores
+    const horarios = abaVoos.getRange(1, 1, 1, abaVoos.getLastColumn()).getValues()[0];
+    const voos = abaVoos.getRange(2, 1, 14, abaVoos.getLastColumn()).getValues().flat().filter(Number.isFinite);
+    const consoles = abaConsoles.getRange(222, 4, 14, abaConsoles.getLastColumn()).getValues().flat().filter(Number.isFinite);
+    const controladores = abaControladores.getRange(276, 4, 14, abaControladores.getLastColumn()).getValues().flat().filter(Number.isFinite);
+  
+    // Verificar se os dados são válidos
+    if (!validarDadosParaRegressao(voos, consoles) || !validarDadosParaRegressao(voos, controladores)) {
+      Logger.log("Erro: Dados insuficientes ou inválidos para calcular a regressão linear.");
+      return;
+    }
+  
+    // Calcular a regressão linear para Voos x Consoles
+    const regressaoConsoles = calcularCoeficientesRegressao(voos, consoles);
+  
+    // Calcular a regressão linear para Voos x Controladores
+    const regressaoControladores = calcularCoeficientesRegressao(voos, controladores);
+  
+    // Exibir os resultados no Logger
+    Logger.log("Fórmula de regressão para Voos x Consoles:");
+    Logger.log(`y = ${regressaoConsoles.a}x + ${regressaoConsoles.b}`);
+  
+    Logger.log("Fórmula de regressão para Voos x Controladores:");
+    Logger.log(`y = ${regressaoControladores.a}x + ${regressaoControladores.b}`);
+  }
+  
+  // Função para calcular os coeficientes da regressão linear (a e b)
+  function calcularCoeficientesRegressao(x, y) {
+    const n = x.length;
+  
+    // Somatórios necessários
+    const somaX = x.reduce((acc, val) => acc + val, 0);
+    const somaY = y.reduce((acc, val) => acc + val, 0);
+    const somaXY = x.reduce((acc, val, i) => acc + val * y[i], 0);
+    const somaX2 = x.reduce((acc, val) => acc + val * val, 0);
+  
+    // Validar divisão por zero
+    const divisor = n * somaX2 - somaX * somaX;
+    if (divisor === 0) {
+      Logger.log("Erro: Variância zero detectada nos dados. Regressão não pode ser calculada.");
+      return { a: NaN, b: NaN };
+    }
+  
+    // Calcular os coeficientes da regressão
+    const a = (n * somaXY - somaX * somaY) / divisor;
+    const b = (somaY - a * somaX) / n;
+  
+    return { a, b };
+  }
+  
+  // Função para validar os dados antes da regressão
+  function validarDadosParaRegressao(x, y) {
+    if (x.length !== y.length || x.length < 2) {
+      Logger.log("Erro: Os dados de entrada têm tamanhos diferentes ou insuficientes.");
+      return false;
+    }
+    return true;
+  }
+  
 function obterDadosAnuais() {
   const planilha = SpreadsheetApp.getActiveSpreadsheet();
 

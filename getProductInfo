@@ -1,0 +1,96 @@
+const puppeteer = require('puppeteer-core'); // Usamos puppeteer-core para especificar o binário do Edge.
+const fs = require('fs');
+const path = require('path');
+
+async function getProductInfo(url, email, password) {
+    let browser;
+    try {
+        // Caminho para o binário do Microsoft Edge
+        const edgePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+
+        browser = await puppeteer.launch({
+            executablePath: edgePath, // Especifica o caminho do Edge
+            headless: false,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+
+        const page = await browser.newPage();
+
+        // Configurar o User-Agent
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36');
+
+        // Acessar a página de login
+        console.log('Acessando página de login...');
+        await page.goto('https://shopee.com.br/buyer/login', { waitUntil: 'networkidle2' });
+
+        // Verificar e aceitar cookies, se necessário
+        try {
+            console.log('Verificando botão de cookies...');
+            const acceptCookiesButton = await page.waitForSelector('button.b5aVaf.PVSuiZ.GuognM.qxS7lQ.Q4KP5g', { timeout: 5000 });
+            await acceptCookiesButton.click();
+            console.log('Cookies aceitos.');
+        } catch (error) {
+            console.log('Botão de cookies não encontrado ou timeout expirou.');
+        }
+
+        // Preencher os campos de login
+        console.log('Preenchendo e-mail e senha...');
+        await page.type('input[name="loginKey"]', email, { delay: 100 });
+        await page.type('input[name="password"]', password, { delay: 100 });
+
+        // Tentar localizar o botão de login e clicar
+        console.log('Realizando login...');
+        const loginButton = await page.waitForSelector('button.b5aVaf', { timeout: 5000 }); // Substituímos pelo seletor correto
+        await loginButton.click();
+
+        // Esperar navegação após login
+        await page.waitForNavigation({ waitUntil: 'networkidle2' });
+        console.log('Login realizado com sucesso.');
+
+        // Navegar para a página do produto
+        console.log('Acessando página do produto...');
+        await page.goto(url, { waitUntil: 'networkidle2' });
+
+        // Salvar o HTML renderizado
+        const content = await page.content();
+        fs.writeFileSync('rendered-page.html', content);
+        console.log('HTML salvo como "rendered-page.html".');
+
+        // Salvar captura de tela
+        const screenshotPath = path.resolve(__dirname, 'debug-screenshot.png');
+        console.log('Tentando salvar a captura de tela...');
+        await page.screenshot({ path: screenshotPath, fullPage: true });
+        console.log(`Captura de tela salva como "${screenshotPath}".`);
+
+        // Extração de dados
+        const title = await page.evaluate(() => {
+            const element = document.querySelector('h1.Bf9ap6');
+            return element ? element.innerText.trim() : 'Título não encontrado';
+        });
+
+        const price = await page.evaluate(() => {
+            const element = document.querySelector('div._3n5NQx');
+            return element ? element.innerText.trim() : 'Preço não encontrado';
+        });
+
+        const imageUrl = await page.evaluate(() => {
+            const element = document.querySelector('picture.UkIsx8 img');
+            return element ? element.src : 'Imagem não encontrada';
+        });
+
+        await browser.close();
+        return { title, price, imageUrl };
+    } catch (error) {
+        console.error('Erro ao extrair os dados:', error);
+        if (browser) await browser.close();
+        return null;
+    }
+}
+
+// Exemplo de uso
+getProductInfo(
+    'https://shopee.com.br/product/499950777/8485573997?uls_trackid=51jjamh00069&utm_campaign=id_TdCLBajxCb&utm_content=----&utm_medium=affiliates&utm_source=an_18307420319&utm_term=cb165pc8dmmq',
+    'felipe565@gmail.com',
+    '01I@mmanm'
+).then(data => console.log(data))
+    .catch(error => console.error(error));

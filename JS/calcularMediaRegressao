@@ -1,0 +1,73 @@
+function calcularMediaRegressao(dados) {
+    // Função para calcular média
+    const media = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+  
+    // Função para calcular coeficientes da regressão linear
+    function calcularRegressao(X, Y) {
+      const mediaX = media(X);
+      const mediaY = media(Y);
+  
+      const numeradorA = X.reduce((acc, x, i) => acc + (x - mediaX) * (Y[i] - mediaY), 0);
+      const denominadorA = X.reduce((acc, x) => acc + Math.pow(x - mediaX, 2), 0);
+  
+      const a = numeradorA / denominadorA; // Coeficiente angular
+      const b = mediaY - a * mediaX; // Intercepto
+  
+      return { a, b };
+    }
+  
+    // Mapear os horários e calcular a regressão linear para cada intervalo
+    const intervalos = Object.keys(dados);
+    const resultadosRegressoesConsoles = [];
+    const resultadosRegressoesControladores = [];
+  
+    intervalos.forEach(horario => {
+      const dataset = dados[horario];
+      const voos = dataset.map(item => item.voos);
+      const consoles = dataset.map(item => item.consoles);
+      const controladores = dataset.map(item => item.controladores);
+  
+      // Calcular regressões para Consoles e Controladores
+      const regressaoConsoles = calcularRegressao(voos, consoles);
+      const regressaoControladores = calcularRegressao(voos, controladores);
+  
+      resultadosRegressoesConsoles.push(regressaoConsoles);
+      resultadosRegressoesControladores.push(regressaoControladores);
+    });
+  
+    // Calcular médias dos coeficientes
+    const mediaAConsoles = media(resultadosRegressoesConsoles.map(r => r.a));
+    const mediaBConsoles = media(resultadosRegressoesConsoles.map(r => r.b));
+  
+    const mediaAControladores = media(resultadosRegressoesControladores.map(r => r.a));
+    const mediaBControladores = media(resultadosRegressoesControladores.map(r => r.b));
+  
+    // Resultado final
+    return {
+      regressaoMedia: {
+        consoles: { a: mediaAConsoles, b: mediaBConsoles },
+        controladores: { a: mediaAControladores, b: mediaBControladores }
+      }
+    };
+  }
+  
+  // Exemplo de uso
+  const dadosAnuais = {
+    // Horários em UTC
+    "0000": [
+      { voos: 10, consoles: 2, controladores: 4 },
+      { voos: 12, consoles: 3, controladores: 5 },
+      // Outros dias para o mesmo horário...
+    ],
+    "0030": [
+      { voos: 15, consoles: 4, controladores: 6 },
+      { voos: 18, consoles: 5, controladores: 7 },
+      // Outros dias para o mesmo horário...
+    ],
+    // Adicionar mais intervalos até "2330"...
+  };
+  
+  const resultadoFinal = calcularMediaRegressao(dadosAnuais);
+  console.log("Média das regressões lineares para Consoles e Controladores:");
+  console.log(resultadoFinal);
+  

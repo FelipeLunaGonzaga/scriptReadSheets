@@ -1,0 +1,152 @@
+function alterarRegistroPorID() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("INICIO");
+  var afastamentosSheet = ss.getSheetByName("AFASTAMENTOS");
+
+  // Obter o ID a ser alterado
+  var idInput = Browser.inputBox("Alterar Registro", "Digite o ID do registro que deseja alterar:", Browser.Buttons.OK_CANCEL);
+
+  if (idInput === 'cancel' || idInput === '') {
+    return; // Usuário cancelou a operação ou não digitou nada
+  }
+
+  var id = parseInt(idInput);
+  if (isNaN(id)) {
+    SpreadsheetApp.getUi().alert("ID inválido.");
+    return;
+  }
+
+  // Encontrar a linha correspondente ao ID na planilha "INICIO"
+  var dataRange = sheet.getRange(18, 13, sheet.getLastRow() - 17, 1).getValues();
+  var linhaAlterar = -1;
+
+  for (var i = 0; i < dataRange.length; i++) {
+    if (dataRange[i][0] === id) {
+      linhaAlterar = i + 18; // A linha correta na planilha
+      break;
+    }
+  }
+
+  if (linhaAlterar === -1) {
+    SpreadsheetApp.getUi().alert("ID não encontrado.");
+    return;
+  }
+
+  var dataInicialAntiga = sheet.getRange(linhaAlterar, 5).getValue(); // Mudança aqui: use getValue()
+  var dataFinalAntiga = sheet.getRange(linhaAlterar, 6).getValue(); // Mudança aqui: use getValue()
+
+  // Coletar novos dados para alterar
+  var novoTrigrama = sheet.getRange(linhaAlterar, 2).getValue();
+  var novoTipoAfastamento = Browser.inputBox("Alterar Tipo", "Digite o tipo (AFASTAMENTO, CURSO, MISSÃO, FÉRIAS):", Browser.Buttons.OK_CANCEL);
+  var novaDataInicial = Browser.inputBox("Alterar Data Inicial", "Digite a nova data inicial (dd/mm/aaaa):", Browser.Buttons.OK_CANCEL);
+  var novaDataFinal = Browser.inputBox("Alterar Data Final", "Digite a nova data final (dd/mm/aaaa):", Browser.Buttons.OK_CANCEL);
+  var novoDescricao = Browser.inputBox("Alterar Descrição", "Digite a nova descrição:", Browser.Buttons.OK_CANCEL);
+
+  if (novaDataInicial === 'cancel' || novaDataFinal === 'cancel' || novoDescricao === 'cancel') {
+    return; // Se o usuário cancelar qualquer campo, encerra a função
+  }
+
+  // Validar e converter as datas
+  var novaDataInicialObj = parseDate(novaDataInicial);
+  var novaDataFinalObj = parseDate(novaDataFinal);
+
+  if (!novaDataInicialObj || !novaDataFinalObj) {
+    SpreadsheetApp.getUi().alert("Datas inválidas. Certifique-se de usar o formato dd/mm/aaaa.");
+    return;
+  }
+
+  // Atualizar os dados na aba "INICIO"
+  sheet.getRange(linhaAlterar, 3, 1, 2).setValue(novoTipoAfastamento);
+  sheet.getRange(linhaAlterar, 5).setValue(novaDataInicialObj);
+  sheet.getRange(linhaAlterar, 6).setValue(novaDataFinalObj);
+  sheet.getRange(linhaAlterar, 7, 1, 5).merge().setValue(novoDescricao);
+
+  // Atualizar a planilha "AFASTAMENTOS"
+  var trigramaRange = afastamentosSheet.getRange("A:A").getValues();
+  var trigramaRow = -1;
+  
+  // Encontrar a linha do trigrama na planilha AFASTAMENTOS
+  for (var j = 0; j < trigramaRange.length; j++) {
+    if (trigramaRange[j][0] === novoTrigrama) {
+      trigramaRow = j + 1;
+      break;
+    }
+  }
+
+  if (trigramaRow === -1) {
+    SpreadsheetApp.getUi().alert("Trigrama não encontrado na planilha AFASTAMENTOS.");
+    return;
+  }
+
+  // Encontrar as colunas para as datas inicial e final antigas
+  var headerRange = afastamentosSheet.getRange(1, 2, 1, afastamentosSheet.getLastColumn() - 1).getValues();
+  var colInicial = localizarColuna(headerRange, dataInicialAntiga); 
+  var colFinal = localizarColuna(headerRange, dataFinalAntiga);
+
+  if (colInicial === -1 || colFinal === -1) {
+    SpreadsheetApp.getUi().alert("Erro ao localizar as colunas das datas no cabeçalho.");
+    return;
+  }
+
+  var range = afastamentosSheet.getRange(trigramaRow, colInicial, 1, colFinal - colInicial + 1);
+  range.clearContent(); // Limpa o conteúdo, mas não afeta a formatação.
+
+  // Aplicar fundo e bordas
+  range.setBackground("#FFFFFF").setBorder(true, true, true, true, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+
+  // Cor de fundo pelo tipo de afastamento novo
+  var backgroundColor;
+  if (novoTipoAfastamento === "AFASTAMENTO") {
+    backgroundColor = "#FFFF00";
+  } else if (novoTipoAfastamento === "CURSO") {
+    backgroundColor = "#00FF00";
+  } else if (novoTipoAfastamento === "MISSÃO") {
+    backgroundColor = "#0000FF";
+  } else if (novoTipoAfastamento === "FÉRIAS") {
+    backgroundColor = "#FFA500";
+  }
+
+  // Encontrar colunas para as novas datas
+  var colInicial2 = localizarColuna(headerRange, novaDataInicialObj);
+  var colFinal2 = localizarColuna(headerRange, novaDataFinalObj);
+
+  if (colInicial2 === -1 || colFinal2 === -1) {
+    SpreadsheetApp.getUi().alert("Erro ao localizar as colunas das novas datas.");
+    return;
+  }
+
+  // Inserir as novas datas na planilha "AFASTAMENTOS"
+  afastamentosSheet.getRange(trigramaRow, colInicial2, 1, colFinal2 - colInicial2 + 1)
+    .setValue(novoDescricao)
+    .setFontWeight("bold")
+    .setBackground(backgroundColor);
+}
+
+// Função para localizar a coluna com base na data
+function localizarColuna(headerRange, targetDate) {
+  for (var k = 0; k < headerRange[0].length; k++) {
+    var currentDate = headerRange[0][k];
+    if (currentDate && currentDate.getTime && currentDate.getTime() === targetDate.getTime()) {
+      return k + 2; // +2 para ajustar a coluna em relação à primeira (coluna A)
+    }
+  }
+  return -1;
+}
+
+// Função para converter a data do formato dd/mm/aaaa para um objeto Date
+function parseDate(dateString) {
+  var parts = dateString.split('/');
+  if (parts.length === 3) {
+    // Formato: dd/mm/aaaa
+    var day = parseInt(parts[0], 10);
+    var month = parseInt(parts[1], 10) - 1;  // Mês começa de 0 no JavaScript
+    var year = parseInt(parts[2], 10);
+    
+    // Verifica se a data é válida
+    var date = new Date(year, month, day);
+    if (date.getDate() === day && date.getMonth() === month && date.getFullYear() === year) {
+      return date;
+    }
+  }
+  return null; // Retorna null se a data for inválida
+}
