@@ -1,6 +1,7 @@
 const puppeteer = require('puppeteer-core');
 const fs = require('fs');
 const { error } = require('console');
+const { resolve } = require('path');
 
 // Função para capturar o Bearer Token
 async function getBearerToken(url, email, password) {
@@ -17,26 +18,20 @@ async function getBearerToken(url, email, password) {
         const page = await browser.newPage();
         let bearerToken = null;
 
-        // Promessa para capturar o token
-        const tokenCaptured = new Promise((resolve, reject) => {
-            page.on('request', (request) => {
-                const headers = request.headers();
-                if (headers['authorization'] && headers['authorization'].startsWith('Bearer ')) {
-                    bearerToken = headers['authorization'].replace('Bearer ', '');
-                    resolve(bearerToken);
-                }
-            });
+        page.on('request', (request) => {
+            const headers = request.headers();
+            if (headers['authorization']?.startsWith('Bearer ')) {
+                bearerToken = headers['authorization'].replace('Bearer ', '');
+            }
         });
 
         console.log('Acessando página de login...');
         await page.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
 
-        await page.waitForSelector('input[placeholder="Digite a senha cadastrada"]', { timeout: 10000 });
+        await page.waitForSelector('input[placeholder="Digite a senha cadastrada"]', { timeout: 20000 });
 
-        console.log('Preenchendo e-mail...');
+        console.log('Preenchendo credenciais...');
         await page.type('input[placeholder="Digite o nome de usuário cadastrado"]', email, { delay: 100 });
-
-        console.log('Preenchendo senha...');
         await page.type('input[placeholder="Digite a senha cadastrada"]', password, { delay: 100 });
 
         console.log('Realizando login...');
@@ -45,20 +40,39 @@ async function getBearerToken(url, email, password) {
             page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 20000 }),
         ]);
 
-        console.log('Login realizado. Aguardando captura do token...');
-        await tokenCaptured; // Aguarda o token ser capturado
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
-        if (bearerToken) {
-            console.log('Bearer Token capturado:', bearerToken);
-        } else {
-            throw new Error('Bearer não encontrado nos cabeçalhos das requisições.');
-        }
+        if (!bearerToken) throw new Error('Bearer Token não capturado.');
 
-        //await browser.close();
+        console.log('Bearer Token capturado:', bearerToken);
+        await browser.close();
         return bearerToken;
     } catch (error) {
-        console.error('Erro ao coletar Bearer ou realizar a tarefa:', error);
+        console.error('Erro ao coletar Bearer Token:', error);
         if (browser) await browser.close();
+        throw error;
+    }
+}
+
+// Função para realizar requisições com retentativas
+async function fetchWithRetry(url, token, maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await new Promise(r => setTimeout(r, 1000));
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) throw new Error(`Erro ${response.status}: ${response.statusText}`);
+            return await response.json();
+        } catch (error) {
+            console.error(`Tentativa ${attempt} falhou: ${error.message}`);
+            if (attempt === maxAttempts) throw error;
+        }
     }
 }
 
@@ -80,36 +94,54 @@ async function coletarDadosDemandas() {
 
         for (const { date, urlDiaEspecifico } of urlsPorDia) {
             var horariosLinha = [];
-            var voosLinha = [];
+
 
             try {
+
+                const urlBeginDate = 'https://sigma.decea.mil.br/sigma-api/v1/sessions/STRATEGICAL?page=1&size=8&sortActive=beginDate&sortDirection=desc&sessionType=STRATEGICAL';
+
+                var dadosBeginDate = await obterTodosDadosResposta(urlBeginDate, token);
+
+                console.log(`Todos os dados IDs Content encontrados são - ${dadosBeginDate}`);
+
                 console.log(`Processando data: ${date}`);
                 console.time(`Tempo para processar ${date}`);
 
-                var idEspecifico2 = await obterIdPagina(urlDiaEspecifico, token, date); // Passe o date aqui
+                var idEspecifico2 = await obterIdPagina(urlDiaEspecifico, token, date);
                 console.log(`O ID específico é: ${idEspecifico2}.`);
 
-                var idSBRE = await obterIdsSbre(idEspecifico2, token);
-                console.log(`O ID SBRE é: ${idSBRE}`);
+                var idSBCWE = await obterIdsSbCW(idEspecifico2, token);
+                var idSBCW = idSBCWE.map(setor => setor.id);
+                var nomeSetor = idSBCWE.map(setor => setor.setor);
 
-                var baseURLFinal = `https://sigma.decea.mil.br/sigma-api/v1/sessions/STRATEGICAL/${idEspecifico2}/regulatedElementOfSession/${idSBRE}/flightIntentions`;
+                var voosLinha = nomeSetor.map(() => []); // ✅ Agora nomeSetor já existe
 
-                for (const intervalo of horarios) {
-                    var url = `${baseURLFinal}?page=1&size=10&capacityType=declared&operationTypeDemandChart=TOTAL&sessionInterval=THIRTY_MINUTES&beginTime=${intervalo.begin}&endTime=${intervalo.end}&levelGE=F150&narrowSearch=false&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE&flightPlanStates=ONGOING_TER`;
+                for (let i = 0; i < idSBCW.length; i++) {
+                    console.log(`O ID SBCW é: ${idSBCW[i]}`);
 
-                    try {
-                        var numeroDeVoos = await obterVoosIntervalo(url, token, intervalo);
-                        console.log(`Data ${date}, intervalo ${intervalo.begin} - ${intervalo.end}: ${numeroDeVoos} voos`);
+                    var baseURLFinal = `https://sigma.decea.mil.br/sigma-api/v1/sessions/STRATEGICAL/${idEspecifico2}/regulatedElementOfSession/${idSBCW[i]}/flightIntentions`;
 
-                        horariosLinha.push(`${intervalo.begin} - ${intervalo.end}`);
-                        voosLinha.push(numeroDeVoos);
-                    } catch (err) {
-                        console.error(`Erro no intervalo ${intervalo.begin} - ${intervalo.end}: ${err.message}`);
+                    for (const intervalo of horarios) {
+                        var url = `${baseURLFinal}?page=1&size=10&capacityType=declared&operationTypeDemandChart=TOTAL&sessionInterval=FIFTEEN_MINUTES&beginTime=${intervalo.begin}&endTime=${intervalo.end}&levelGE=F150&narrowSearch=false&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE&flightPlanStates=ONGOING_TER`;
+
+                        try {
+                            var numeroDeVoos = await obterVoosIntervalo(url, token, intervalo);
+                            console.log(`Data ${date}, intervalo ${intervalo.begin} - ${intervalo.end}: ${numeroDeVoos} voos`);
+
+                            horariosLinha.push(`${intervalo.begin} - ${intervalo.end}`);
+
+                            if (!Array.isArray(voosLinha[i])) { // ✅ Garante que voosLinha[i] seja um array
+                                voosLinha[i] = [];
+                            }
+                            voosLinha[i].push(numeroDeVoos);
+                        } catch (err) {
+                            console.error(`Erro no intervalo ${intervalo.begin} - ${intervalo.end}: ${err.message}`);
+                        }
                     }
-                }
 
-                salvarComoCSV(date, horariosLinha, voosLinha);
-                console.timeEnd(`Tempo para processar ${date}`);
+                    salvarComoCSV(nomeSetor, date, horariosLinha, voosLinha);
+                    console.timeEnd(`Tempo para processar ${date}`);
+                }
             } catch (err) {
                 console.error(`Erro ao processar a data ${date}: ${err.message}`);
             }
@@ -119,8 +151,42 @@ async function coletarDadosDemandas() {
     }
 }
 
+async function obterTodosDadosResposta(url, token) {
+    try { 
+        var resposta = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
 
-// Função para obter o ID da página
+        if (!resposta.ok) {
+            throw new Error(`Erro ao obter ID da página de coleta das respostas - ${resposta.statusText}`);
+        }
+
+        var dados = await resposta.json();
+        
+        // Verifica se 'content' existe e não está vazio
+        if (!dados.content || dados.content.length === 0) {
+            throw new Error('Nenhum dado encontrado em content.');
+        }
+
+        // Mapeia todos os valores de beginDate
+        var idsContent = dados.content.map(obj => obj.id);
+        
+        console.log(`Todos os Ids Content encontrados são:`, idsContent);
+
+        // Retorna o ID do primeiro elemento encontrado (caso necessário)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return dados.content[0]?.id || null;
+
+    } catch (error) {
+        console.error(`Erro ao tentar encontrar todos os elementos de resposta - erro ${error.message}`);
+    }
+}
+
+
 // Função para obter o ID da página
 async function obterIdPagina(url, token, date) {
     const [year, month, day] = date.split('-'); // Extraímos year, month e day a partir da string date
@@ -143,6 +209,7 @@ async function obterIdPagina(url, token, date) {
         console.log(`O ano, mês e dia são: ${year}, ${month} e ${day}`);
 
         if (objetoData) {
+            await new Promise (resolve => setTimeout(resolve, 1000));    
             return objetoData.id;
         } else {
             throw new Error('ID Específico não encontrado');
@@ -153,14 +220,14 @@ async function obterIdPagina(url, token, date) {
 }
 
 
-// Função para obter o ID SBRE
-async function obterIdsSbre(idEspecifico, token) {
-    var idsEncontrados = {};
-    
-    for (let i = 1; i <= 15; i++) {
-        let nomeSetor = `SBRE.RE${i.toString().padStart(2, '0')}`;
-        let url = `https://sigma.decea.mil.br/sigma-api/v1/sessions/STRATEGICAL/${idEspecifico}/regulatedElementOfSession/dashboard?page=1&size=200&regulatedType=FIR_SECTOR&name=SBRE&sessionInterval=THIRTY_MINUTES&fullSearch=false&status=NORMAL,CONGESTION,SATURATION&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE`;
-        
+// Função para obter o ID SBCW
+async function obterIdsSbCW(idEspecifico, token) {
+    var idsEncontrados = [];
+
+    for (let i = 1; i <= 18; i++) {
+        let nomeSetor = `SBCW.CW${i.toString().padStart(2, '0')}`;
+        let url = `https://sigma.decea.mil.br/sigma-api/v1/sessions/STRATEGICAL/${idEspecifico}/regulatedElementOfSession/dashboard?page=1&size=200&regulatedType=FIR_SECTOR&name=SBCW&sessionInterval=FIFTEEN_MINUTES&fullSearch=false&status=NORMAL,CONGESTION,SATURATION&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE`;
+
         try {
             var resposta = await fetch(url, {
                 method: 'GET',
@@ -168,6 +235,7 @@ async function obterIdsSbre(idEspecifico, token) {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
                 },
+                
             });
 
             if (!resposta.ok) {
@@ -176,26 +244,31 @@ async function obterIdsSbre(idEspecifico, token) {
             }
 
             var dados = await resposta.json();
-            var objetoSBRE = dados.content.find((obj) => obj.name === nomeSetor);
+            var objetoSBCW = dados.content.find((obj) => obj.name === nomeSetor);
+            console.log(`O nome do setor é: ${objetoSBCW?.name}`);
 
-            if (objetoSBRE) {
-                idsEncontrados[nomeSetor] = objetoSBRE.id;
-                salvarComoCSV(nomeSetor, objetoSBRE.id);
+            if (objetoSBCW) {
+                idsEncontrados.push({ setor: nomeSetor, id: objetoSBCW.id });
+                console.log(`O ID do setor ${nomeSetor} é: ${objetoSBCW.id}`);
             }
+            await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (error) {
             console.error(`Erro ao buscar ID ${nomeSetor} na URL: ${url} - Erro: ${error.message}`);
         }
     }
 
-    if (Object.keys(idsEncontrados).length === 0) {
-        throw new Error('Nenhum ID SBRE encontrado.');
+    if (idsEncontrados.length === 0) {
+        throw new Error('Nenhum ID SBCW encontrado.');
     }
 
     return idsEncontrados;
 }
 
+
 // Função para obter número de voos em um intervalo
 async function obterVoosIntervalo(url, token, intervalo) {
+    await new Promise(resolve => setTimeout(resolve, 1000)); // ✅ Correção aplicada
+
     var resposta = await fetch(url, {
         method: 'GET',
         headers: {
@@ -212,23 +285,42 @@ async function obterVoosIntervalo(url, token, intervalo) {
     return dados.totalElements || 0;
 }
 
+
 // Gerar intervalos de horários
 function gerarHorarios() {
     const horarios = [];
+    
     for (let hora = 0; hora < 24; hora++) {
-        const horaStr = hora.toString().padStart(2, '0');
-        const proximaHoraStr = ((hora + 1) % 24).toString().padStart(2, '0');
-        horarios.push({ begin: `${horaStr}:00`, end: `${horaStr}:30` });
-        horarios.push({ begin: `${horaStr}:30`, end: `${proximaHoraStr}:00` });
+        for (let minuto = 0; minuto < 60; minuto += 15) {
+            const horaInicio = hora.toString().padStart(2, '0');
+            const minutoInicio = minuto.toString().padStart(2, '0');
+
+            let horaFim = hora;
+            let minutoFim = minuto + 15;
+
+            if (minutoFim === 60) {
+                minutoFim = 0;
+                horaFim = (hora + 1) % 24;
+            }
+
+            const horaFimStr = horaFim.toString().padStart(2, '0');
+            const minutoFimStr = minutoFim.toString().padStart(2, '0');
+
+            horarios.push({ begin: `${horaInicio}:${minutoInicio}`, end: `${horaFimStr}:${minutoFimStr}` });
+        }
     }
+    
     return horarios;
 }
+
+console.log(gerarHorarios());
+
 
 // Gerar datas com links para URLs
 function gerarDatasComLinks() {
     const links = [];
-    const startDate = new Date('2025-02-01');
-    const endDate = new Date('2025-02-07');
+    const startDate = new Date('2025-02-06');
+    const endDate = new Date('2025-02-12');
 
     while (startDate <= endDate) {
         const year = startDate.getFullYear();
@@ -245,15 +337,35 @@ function gerarDatasComLinks() {
 }
 
 // Salvar como CSV
-function salvarComoCSV(date, horariosLinha, voosLinha) {
-    const csvContent = [
-        horariosLinha.join(','),
-        voosLinha.join(',')
-    ].join('\n');
 
-    fs.writeFileSync(`${nomeSetor} dados_demandas_${date}.csv`, csvContent, 'utf8');
-    console.log(`Arquivo CSV salvo como "${nomeSetor} dados_demandas_${date}.csv"`);
+function salvarComoCSV(nomeSetor, date, horariosLinha, voosLinha) {
+    // Garantindo que voosLinha é um array de arrays
+    if (!Array.isArray(voosLinha) || !voosLinha.every(Array.isArray)) {
+        console.error("Erro: voosLinha deve ser um array de arrays!");
+        return;
+    }
+
+    // Formatar a data para o formato desejado
+    const dataFormatada = `${date.split('-')[2]}/${date.split('-')[1]}/${date.split('-')[0]}`;
+
+    // Criando a primeira linha do CSV com a data e os horários
+    let csvContent = `Setor\tData\t${horariosLinha.join('\t')}\n`;
+
+    // Adicionando os dados de cada setor
+    for (let i = 0; i < 18; i++) {
+        let setorVoos = nomeSetor[i] + '\t' + dataFormatada + '\t'; // Setor e Data
+        let voosPorSetor = Array.isArray(voosLinha[i]) ? voosLinha[i].join('\t') : voosLinha[i]; // Garantir que é uma string
+        csvContent += setorVoos + voosPorSetor + '\n';
+    }
+
+    // Salvar o arquivo CSV
+    const fileName = `${nomeSetor[0]} - dados_demandas_${date}.csv`;
+    fs.writeFileSync(fileName, csvContent, 'utf8');
+    console.log(`Arquivo CSV salvo como "${fileName}"`);
 }
 
+
+
 // Executar a função principal
+
 coletarDadosDemandas();

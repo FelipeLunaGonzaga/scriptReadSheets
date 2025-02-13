@@ -1,5 +1,5 @@
-const puppeteer = require('puppeteer-core');
-const fs = require('fs');
+import puppeteer from 'puppeteer-core';
+import fs from 'fs';
 
 // Função para capturar o Bearer Token
 async function getBearerToken(url, email, password) {
@@ -106,6 +106,8 @@ async function coletarDadosDemandas() {
                     }
                 }
 
+                await sendToAppScript(horariosLinha, voosLinha);
+
                 salvarComoCSV(date, horariosLinha, voosLinha);
                 console.timeEnd(`Tempo para processar ${date}`);
             } catch (err) {
@@ -114,6 +116,33 @@ async function coletarDadosDemandas() {
         }
     } catch (error) {
         console.error('Erro na coleta de dados:', error.message);
+    }
+}
+
+async function sendToAppScript(horariosLinha, voosLinha) {
+
+    const urlAppScript = 'https://script.google.com/macros/s/AKfycbwmK0QBRR1sXqHR28HkpYWVlkyyeibaUWFAca65L6MFio8fzncfqvzQZSdyHjJ0l19o/exec';
+
+    try {
+
+        const csvContent = [
+            horariosLinha.join(','),
+            voosLinha.join(',')
+        ].join('\n');   
+        
+
+        const resposta = await axios.post(urlAppScript, { 
+
+            csvContent: csvContent
+
+        }, {
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        console.log(`✅ Token e Cookies enviados para o AppScript - Resposta: ${resposta.data}`);
+
+    } catch (error) {
+        console.log(`❌ Erro ao enviar os dados para o AppScript: ${error.message}`);
     }
 }
 
@@ -138,7 +167,7 @@ async function obterIdPagina(url, token) {
 // Função para obter o ID SBRE
 async function obterIdSbre(idEspecifico, token) {
     var urls = [
-        `https://sigma.decea.mil.br/sigma-api/v1/sessions/HISTORICAL/${idEspecifico}/regulatedElementOfSession/dashboard?page=1&size=8&regulatedType=FIR_SECTOR_GROUP&name=SBRE&sessionInterval=THIRTY_MINUTES&fullSearch=false&status=NORMAL,CONGESTION,SATURATION&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE`,
+        `https://sigma.decea.mil.br/sigma-api/v1/sessions/HISTORICAL/${idEspecifico}/regulatedElementOfSession/dashboard?page=1&size=100&regulatedType=FIR_SECTOR_GROUP&name=SBRE&sessionInterval=THIRTY_MINUTES&fullSearch=false&status=NORMAL,CONGESTION,SATURATION&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE`,
         `https://sigma.decea.mil.br/sigma-api/v1/sessions/HISTORICAL/${idEspecifico}/regulatedElementOfSession/dashboard?page=2&size=8&regulatedType=FIR_SECTOR_GROUP&name=SBRE&sessionInterval=THIRTY_MINUTES&fullSearch=false&status=NORMAL,CONGESTION,SATURATION&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE`
     ];
 
@@ -204,8 +233,8 @@ function gerarHorarios() {
 // Gerar datas com links para URLs
 function gerarDatasComLinks() {
     const links = [];
-    const startDate = new Date('2025-01-24');
-    const endDate = new Date('2025-01-28');
+    const startDate = new Date('2025-02-12');
+    const endDate = new Date('2025-02-14');
 
     while (startDate <= endDate) {
         const year = startDate.getFullYear();

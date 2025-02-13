@@ -1,6 +1,5 @@
-const puppeteer = require('puppeteer-core');
-const fs = require('fs');
-const { error } = require('console');
+import puppeteer from 'puppeteer-core';
+import fs from 'fs';
 
 // Função para capturar o Bearer Token
 async function getBearerToken(url, email, password) {
@@ -108,6 +107,8 @@ async function coletarDadosDemandas() {
                     }
                 }
 
+                await sendToAppScript(horariosLinha, voosLinha);
+
                 salvarComoCSV(date, horariosLinha, voosLinha);
                 console.timeEnd(`Tempo para processar ${date}`);
             } catch (err) {
@@ -119,8 +120,33 @@ async function coletarDadosDemandas() {
     }
 }
 
+async function sendToAppScript(horariosLinha, voosLinha) {
 
-// Função para obter o ID da página
+    const urlAppScript = 'https://script.google.com/macros/s/AKfycbwmK0QBRR1sXqHR28HkpYWVlkyyeibaUWFAca65L6MFio8fzncfqvzQZSdyHjJ0l19o/exec';
+
+    try {
+
+        const csvContent = [
+            horariosLinha.join(','),
+            voosLinha.join(',')
+        ].join('\n');   
+        
+
+        const resposta = await axios.post(urlAppScript, { 
+
+            csvContent: csvContent
+
+        }, {
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        console.log(`✅ Token e Cookies enviados para o AppScript - Resposta: ${resposta.data}`);
+
+    } catch (error) {
+        console.log(`❌ Erro ao enviar os dados para o AppScript: ${error.message}`);
+    }
+}
+
 // Função para obter o ID da página
 async function obterIdPagina(url, token, date) {
     const [year, month, day] = date.split('-'); // Extraímos year, month e day a partir da string date
@@ -156,7 +182,7 @@ async function obterIdPagina(url, token, date) {
 // Função para obter o ID SBRE
 async function obterIdSbre(idEspecifico, token) {
     var urls = [
-        `https://sigma.decea.mil.br/sigma-api/v1/sessions/STRATEGICAL/${idEspecifico}/regulatedElementOfSession/dashboard?page=1&size=8&regulatedType=FIR_SECTOR_GROUP&name=SBRE&sessionInterval=THIRTY_MINUTES&fullSearch=false&status=NORMAL,CONGESTION,SATURATION&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE`,
+        `https://sigma.decea.mil.br/sigma-api/v1/sessions/STRATEGICAL/${idEspecifico}/regulatedElementOfSession/dashboard?page=1&size=100&regulatedType=FIR_SECTOR_GROUP&name=SBRE&sessionInterval=THIRTY_MINUTES&fullSearch=false&status=NORMAL,CONGESTION,SATURATION&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE`,
         `https://sigma.decea.mil.br/sigma-api/v1/sessions/STRATEGICAL/${idEspecifico}/regulatedElementOfSession/dashboard?page=2&size=8&regulatedType=FIR_SECTOR_GROUP&name=SBRE&sessionInterval=THIRTY_MINUTES&fullSearch=false&status=NORMAL,CONGESTION,SATURATION&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE`,
         `https://sigma.decea.mil.br/sigma-api/v1/sessions/STRATEGICAL/${idEspecifico}/regulatedElementOfSession/dashboard?page=3&size=8&regulatedType=FIR_SECTOR_GROUP&name=SBRE&sessionInterval=THIRTY_MINUTES&fullSearch=false&status=NORMAL,CONGESTION,SATURATION&flightIntentionTypes=RPL_INSTANCE,FPL_INSTANCE,HOTRAN_INSTANCE`
     ];
@@ -223,8 +249,8 @@ function gerarHorarios() {
 // Gerar datas com links para URLs
 function gerarDatasComLinks() {
     const links = [];
-    const startDate = new Date('2025-01-31');
-    const endDate = new Date('2025-02-06');
+    const startDate = new Date('2025-02-15');
+    const endDate = new Date('2025-02-16');
 
     while (startDate <= endDate) {
         const year = startDate.getFullYear();
