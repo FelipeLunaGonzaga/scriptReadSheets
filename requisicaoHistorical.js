@@ -1,5 +1,7 @@
 import puppeteer from 'puppeteer-core';
 import fs from 'fs';
+import axios from 'axios';
+import { resolve } from 'path';
 
 // Função para capturar o Bearer Token
 async function getBearerToken(url, email, password) {
@@ -57,7 +59,7 @@ async function getBearerToken(url, email, password) {
         return bearerToken;
     } catch (error) {
         console.error('Erro ao coletar Bearer ou realizar a tarefa:', error);
-        if (browser) await browser.close();
+        // if (browser) await browser.close();
     }
 }
 
@@ -65,11 +67,7 @@ async function getBearerToken(url, email, password) {
 async function coletarDadosDemandas() {
     try {
         // Garante que o token será coletado antes de prosseguir
-        const token = await getBearerToken(
-            'https://sigma.decea.mil.br/sigma-ui/login',
-            'lunaflg',
-            '01I@mmanm'
-        );
+        const token = '15d0449d-5402-4b50-99f2-7f0b0c7805ed ';
 
         console.log('Token coletado:', token);
 
@@ -120,32 +118,28 @@ async function coletarDadosDemandas() {
 }
 
 async function sendToAppScript(horariosLinha, voosLinha) {
-
-    const urlAppScript = 'https://script.google.com/macros/s/AKfycbwmK0QBRR1sXqHR28HkpYWVlkyyeibaUWFAca65L6MFio8fzncfqvzQZSdyHjJ0l19o/exec';
+    const urlAppScript = 'https://script.google.com/macros/s/AKfycbwfQ8pwrOYXSrW7dkB6-xbkUQ6uMKbvARPLq6O9RY5AJ6ipb_U_fXQZM0IoyGQRxoHx/exec';
 
     try {
-
         const csvContent = [
             horariosLinha.join(','),
             voosLinha.join(',')
-        ].join('\n');   
-        
+        ].join('\n');
+
+        console.log("📡 Enviando dados para o Apps Script...");
 
         const resposta = await axios.post(urlAppScript, { 
-
             csvContent: csvContent
-
         }, {
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 30000 // 30 segundos
         });
 
-        console.log(`✅ Token e Cookies enviados para o AppScript - Resposta: ${resposta.data}`);
-
+        console.log(`✅ Dados enviados para o AppScript - Resposta: ${resposta.data}`);
     } catch (error) {
-        console.log(`❌ Erro ao enviar os dados para o AppScript: ${error.message}`);
+        console.error(`❌ Erro ao enviar os dados para o AppScript: ${error.message}`);
     }
 }
-
 // Função para obter o ID da página
 async function obterIdPagina(url, token) {
     var resposta = await fetch(url, {
@@ -202,6 +196,9 @@ async function obterIdSbre(idEspecifico, token) {
 
 // Função para obter número de voos em um intervalo
 async function obterVoosIntervalo(url, token, intervalo) {
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
     var resposta = await fetch(url, {
         method: 'GET',
         headers: {
@@ -233,15 +230,15 @@ function gerarHorarios() {
 // Gerar datas com links para URLs
 function gerarDatasComLinks() {
     const links = [];
-    const startDate = new Date('2025-02-12');
-    const endDate = new Date('2025-02-14');
+    const startDate = new Date('2025-02-14');
+    const endDate = new Date('2025-02-15');
 
     while (startDate <= endDate) {
         const year = startDate.getFullYear();
         const month = (startDate.getMonth() + 1).toString().padStart(2, '0');
         const day = startDate.getDate().toString().padStart(2, '0');
 
-        const url = `https://sigma.decea.mil.br/sigma-api/v1/sessions/HISTORICAL?page=1&size=8&sortActive=beginDate&sortDirection=desc&sessionType=HISTORICAL&beginDate=${year}-${month}-${day}T00:00:00.000Z`;
+        const url = `https://sigma.decea.mil.br/sigma-api/v1/sessions/HISTORICAL?page=1&size=8&sortActive=beginDate&sortDirection=desc&sessionType=HISTORICAL&beginDate=${year}-${month}-${day}T03:00:00.000Z`;
 
         links.push({ date: `${year}-${month}-${day}`, urlDiaEspecifico: url });
         startDate.setDate(startDate.getDate() + 1);
